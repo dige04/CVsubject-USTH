@@ -1,0 +1,442 @@
+/* ========================================================================
+   Hand Landmark Data Collector -- Styles
+   Design: Utility & Function, dark theme, borders-only depth, monospace data
+   ======================================================================== */
+
+/* --- Reset & Base --- */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Neutral foundation (cool slate) */
+  --bg-root: #0e1117;
+  --bg-surface: #161b22;
+  --bg-elevated: #1c2129;
+  --bg-input: #0d1117;
+
+  /* Borders */
+  --border: rgba(139, 148, 158, 0.15);
+  --border-strong: rgba(139, 148, 158, 0.25);
+
+  /* Text hierarchy */
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #656d76;
+  --text-faint: #484f58;
+
+  /* Accent -- cyan/teal */
+  --accent: #58a6ff;
+  --accent-muted: rgba(88, 166, 255, 0.15);
+
+  /* Semantic */
+  --recording: #f0883e;
+  --recording-bg: rgba(240, 136, 62, 0.12);
+  --success: #3fb950;
+  --success-bg: rgba(63, 185, 80, 0.12);
+  --danger: #f85149;
+  --danger-bg: rgba(248, 81, 73, 0.10);
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+
+  /* Transitions */
+  --transition: 150ms ease;
+}
+
+html {
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-root);
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
+/* --- App Shell --- */
+.app {
+  width: 100%;
+  max-width: 720px;
+  padding: 24px 16px 32px;
+}
+
+/* --- Header --- */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.header__title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.header__person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header__person label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.header__person input {
+  width: 160px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.header__person input:focus {
+  border-color: var(--accent);
+}
+
+.header__person input::placeholder {
+  color: var(--text-faint);
+}
+
+/* --- Video Container --- */
+.video-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+#webcam {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* mirror */
+}
+
+#overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(-1); /* mirror to match video */
+}
+
+/* Camera Error */
+.camera-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--bg-surface);
+  z-index: 10;
+}
+
+.camera-error__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.camera-error__message {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+  max-width: 360px;
+  line-height: 1.5;
+}
+
+/* Video Badges */
+.video-badge {
+  position: absolute;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.65);
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.video-badge--fps {
+  top: 8px;
+  left: 8px;
+}
+
+.video-badge--hands {
+  top: 8px;
+  right: 8px;
+}
+
+.video-badge--gesture {
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--recording);
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(240, 136, 62, 0.3);
+}
+
+.video-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--recording);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* --- Status Bar --- */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.status-bar__recording {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.status-bar__model {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.status-bar__model.status-bar__model--ready {
+  color: var(--success);
+}
+
+/* Status Indicator Dot */
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-indicator--idle {
+  background: var(--text-faint);
+}
+
+.status-indicator--recording {
+  background: var(--recording);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.status-indicator--paused {
+  background: var(--text-muted);
+}
+
+/* --- Gesture Counts --- */
+.gesture-counts {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.gesture-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.gesture-count.gesture-count--active {
+  border-color: var(--recording);
+  background: var(--recording-bg);
+}
+
+.gesture-count__key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+}
+
+.gesture-count--active .gesture-count__key {
+  color: var(--recording);
+  border-color: rgba(240, 136, 62, 0.4);
+  background: rgba(240, 136, 62, 0.08);
+}
+
+.gesture-count__name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.3;
+}
+
+.gesture-count__value {
+  font-size: 18px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* --- Controls --- */
+.controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn {
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition);
+  outline: none;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  color: var(--text-primary);
+  background: var(--accent-muted);
+  border-color: rgba(88, 166, 255, 0.3);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: rgba(88, 166, 255, 0.22);
+  border-color: rgba(88, 166, 255, 0.45);
+}
+
+.btn--danger {
+  color: var(--text-primary);
+  background: var(--danger-bg);
+  border-color: rgba(248, 81, 73, 0.2);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: rgba(248, 81, 73, 0.18);
+  border-color: rgba(248, 81, 73, 0.35);
+}
+
+/* --- Instructions Footer --- */
+.instructions {
+  margin-top: 12px;
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  vertical-align: 1px;
+}
+
+/* --- Responsive --- */
+@media (max-width: 600px) {
+  .app {
+    padding: 16px 8px 24px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .header__person input {
+    width: 100%;
+  }
+
+  .gesture-counts {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

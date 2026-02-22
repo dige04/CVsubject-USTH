@@ -1,0 +1,381 @@
+/* ==========================================================
+   Jigsaw Puzzle Game - Styles
+   Clean dark theme with soft contrasts.
+   ========================================================== */
+
+/* --- Reset & Base --- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg-primary: #0f0f1a;
+  --bg-secondary: #1a1a2e;
+  --bg-card: #16213e;
+  --text-primary: #e0e0e0;
+  --text-secondary: #8a8a9a;
+  --accent: #64b5f6;
+  --accent-hover: #90caf9;
+  --success: #4caf50;
+  --border: #2a2a4a;
+  --radius: 8px;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* --- App Layout --- */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-height: 100vh;
+}
+
+/* --- Header --- */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.header-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+}
+
+.header-stats {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.stat-value {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 40px;
+}
+
+/* --- Main Canvas Area --- */
+.main-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+#game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+
+#game-canvas:active {
+  cursor: grabbing;
+}
+
+/* --- Webcam Preview --- */
+.webcam-container {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 200px;
+  height: 150px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 2px solid var(--border);
+  background: #000;
+  box-shadow: var(--shadow);
+  z-index: 10;
+}
+
+.webcam-container.hidden {
+  display: none;
+}
+
+.webcam-container video,
+.webcam-container canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.webcam-container canvas {
+  pointer-events: none;
+}
+
+.webcam-label {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 6px;
+  border-radius: 3px;
+  z-index: 2;
+}
+
+/* --- Footer / Controls --- */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.footer-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.gesture-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gesture-label {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.confidence-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.mode-label {
+  padding: 3px 10px;
+  background: var(--bg-card);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.footer-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* --- Buttons --- */
+.btn {
+  padding: 7px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: #1e2d50;
+  border-color: var(--accent);
+}
+
+.btn:active {
+  background: #253a5e;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #0f0f1a;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+/* --- Select --- */
+.select {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238a8a9a' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+}
+
+.select:hover {
+  border-color: var(--accent);
+}
+
+/* --- Hidden file input --- */
+.file-input-hidden {
+  display: none;
+}
+
+/* --- Snapshot Modal --- */
+.snapshot-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 100;
+}
+
+.snapshot-modal.hidden {
+  display: none;
+}
+
+.snapshot-content {
+  position: relative;
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.snapshot-content img {
+  display: block;
+  max-width: 800px;
+  max-height: 70vh;
+  border-radius: 4px;
+}
+
+.snapshot-close {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #0f0f1a;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.snapshot-close:hover {
+  background: var(--accent-hover);
+}
+
+/* --- Keyboard hints --- */
+.keyboard-hints {
+  position: absolute;
+  bottom: 60px;
+  left: 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  line-height: 1.6;
+  pointer-events: none;
+}
+
+.keyboard-hints kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-card);
+  font-family: inherit;
+  font-size: 11px;
+}
+
+/* --- Responsive --- */
+@media (max-width: 640px) {
+  .header {
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .header-title {
+    font-size: 16px;
+  }
+
+  .header-stats {
+    gap: 12px;
+  }
+
+  .stat {
+    font-size: 12px;
+  }
+
+  .footer {
+    padding: 8px 12px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .footer-status {
+    justify-content: center;
+  }
+
+  .footer-controls {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .webcam-container {
+    width: 140px;
+    height: 105px;
+  }
+
+  .keyboard-hints {
+    display: none;
+  }
+}

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hand Landmark Data Collector</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1 class="header__title">Hand Landmark Collector</h1>
+      <div class="header__person">
+        <label for="person-id">Person ID</label>
+        <input type="text" id="person-id" placeholder="e.g. person_01" spellcheck="false" autocomplete="off">
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="video-container">
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="overlay"></canvas>
+        <div id="camera-error" class="camera-error" hidden>
+          <p class="camera-error__title">Camera Unavailable</p>
+          <p class="camera-error__message" id="error-message">Could not access webcam. Please grant camera permission and reload.</p>
+        </div>
+        <div class="video-badge video-badge--fps" id="fps-badge">FPS: --</div>
+        <div class="video-badge video-badge--hands" id="hands-badge">Hands: 0</div>
+        <div class="video-badge video-badge--gesture" id="gesture-badge" hidden>
+          <span class="video-badge__dot"></span>
+          <span id="gesture-label">--</span>
+        </div>
+      </div>
+
+      <section class="status-bar">
+        <div class="status-bar__recording" id="recording-status">
+          <span class="status-indicator status-indicator--idle" id="status-dot"></span>
+          <span id="status-text">Idle -- press 1-5 to start labeling</span>
+        </div>
+        <div class="status-bar__model" id="model-status">Loading model...</div>
+      </section>
+
+      <section class="gesture-counts">
+        <div class="gesture-count" data-gesture="Open Hand">
+          <span class="gesture-count__key">1</span>
+          <span class="gesture-count__name">Open Hand</span>
+          <span class="gesture-count__value" id="count-open_hand">0</span>
+        </div>
+        <div class="gesture-count" data-gesture="Fist">
+          <span class="gesture-count__key">2</span>
+          <span class="gesture-count__name">Fist</span>
+          <span class="gesture-count__value" id="count-fist">0</span>
+        </div>
+        <div class="gesture-count" data-gesture="Pinch">
+          <span class="gesture-count__key">3</span>
+          <span class="gesture-count__name">Pinch</span>
+          <span class="gesture-count__value" id="count-pinch">0</span>
+        </div>
+        <div class="gesture-count" data-gesture="Frame">
+          <span class="gesture-count__key">4</span>
+          <span class="gesture-count__name">Frame</span>
+          <span class="gesture-count__value" id="count-frame">0</span>
+        </div>
+        <div class="gesture-count" data-gesture="None">
+          <span class="gesture-count__key">5</span>
+          <span class="gesture-count__name">None</span>
+          <span class="gesture-count__value" id="count-none">0</span>
+        </div>
+      </section>
+
+      <section class="controls">
+        <button class="btn btn--primary" id="btn-download" disabled>Download CSV</button>
+        <button class="btn btn--danger" id="btn-clear" disabled>Clear Data</button>
+      </section>
+
+      <footer class="instructions">
+        <p><kbd>1</kbd>-<kbd>5</kbd> Label gesture &nbsp;&middot;&nbsp; <kbd>Space</kbd> Pause/Resume &nbsp;&middot;&nbsp; <kbd>Enter</kbd> Download CSV</p>
+      </footer>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script type="module">
+    // Inline module script to bootstrap CDN imports (file:// compatible)
+    import {
+      FilesetResolver,
+      HandLandmarker,
+      DrawingUtils,
+    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/vision_bundle.mjs";
+
+    // Pass imported modules to app.js and boot
+    window.__initApp({ FilesetResolver, HandLandmarker, DrawingUtils });
+  </script>
+</body>
+</html>

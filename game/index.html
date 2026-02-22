@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jigsaw Puzzle - Gesture Control</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-title">Jigsaw Puzzle</div>
+      <div class="header-stats">
+        <div class="stat">
+          <span>Time:</span>
+          <span class="stat-value" id="timer">00:00</span>
+        </div>
+        <div class="stat">
+          <span>Moves:</span>
+          <span class="stat-value" id="moves">0</span>
+        </div>
+        <div class="stat">
+          <span>Done:</span>
+          <span class="stat-value" id="completion">0%</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main game area -->
+    <div class="main-area">
+      <canvas id="game-canvas"></canvas>
+
+      <!-- Webcam preview (hidden by default) -->
+      <div id="webcam-container" class="webcam-container hidden">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="webcam-overlay" width="320" height="240"></canvas>
+        <span class="webcam-label">Camera</span>
+      </div>
+
+      <!-- Keyboard hints -->
+      <div class="keyboard-hints">
+        <kbd>Click</kbd> Select / Drag piece<br>
+        <kbd>R</kbd> Rotate piece<br>
+        <kbd>S</kbd> Take snapshot
+      </div>
+    </div>
+
+    <!-- Footer / Controls -->
+    <footer class="footer">
+      <div class="footer-status">
+        <div class="gesture-info">
+          <span>Gesture:</span>
+          <span class="gesture-label" id="gesture-label">Mouse mode active</span>
+          <span class="confidence-label" id="confidence-label"></span>
+        </div>
+        <span class="mode-label" id="mode-label">Mouse Mode</span>
+      </div>
+      <div class="footer-controls">
+        <button class="btn btn-primary" id="btn-new-game">New Game</button>
+        <button class="btn" id="btn-camera">Camera On</button>
+        <select class="select" id="select-difficulty">
+          <option value="3">3 x 3 (Easy)</option>
+          <option value="4" selected>4 x 4 (Normal)</option>
+          <option value="5">5 x 5 (Hard)</option>
+          <option value="6">6 x 6 (Expert)</option>
+        </select>
+        <button class="btn" id="btn-upload">Upload Image</button>
+        <input type="file" id="file-input" class="file-input-hidden" accept="image/*">
+      </div>
+    </footer>
+
+    <!-- Snapshot modal -->
+    <div id="snapshot-modal" class="snapshot-modal hidden">
+      <div class="snapshot-content">
+        <button class="snapshot-close" id="btn-close-snapshot">X</button>
+        <img id="snapshot-img" alt="Puzzle snapshot">
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scripts: game.js and gesture.js are pure modules, main.js connects them -->
+  <script src="game.js"></script>
+  <script src="gesture.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

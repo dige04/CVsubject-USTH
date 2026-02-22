@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.DS_Store
+*.egg-info/
+dist/
+build/
+.env
+data/annotations/
+data/annotations.zip
+data/photos/
+models/mlp_model/
+models/*.joblib
+models/hand_landmarker.task
+*.keras

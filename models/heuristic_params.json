@@ -1,0 +1,7 @@
+{
+  "curl_extended_threshold": 140.0,
+  "curl_curled_threshold": 100.0,
+  "pinch_distance_threshold": 0.4,
+  "spread_high_threshold": 0.8,
+  "spread_low_threshold": 0.3
+}
