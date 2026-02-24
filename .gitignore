@@ -12,3 +12,4 @@ models/mlp_model/
 models/*.joblib
 models/hand_landmarker.task
 *.keras
+tectonic\n.tectonic_cache/

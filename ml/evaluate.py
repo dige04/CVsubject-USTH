@@ -27,9 +27,9 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
-from sklearn.model_selection import GroupKFold, StratifiedKFold
+from sklearn.model_selection import GroupKFold, GroupShuffleSplit, StratifiedKFold
 
-GESTURE_CLASSES = ["open_hand", "fist", "pinch", "frame", "none"]
+from preprocessing import GESTURE_CLASSES
 
 
 class Classifier(Protocol):
@@ -203,26 +203,41 @@ class Evaluator:
         ],
         X: np.ndarray,
         y: np.ndarray,
+        groups: np.ndarray | None = None,
         test_size: float = 0.2,
         random_state: int = 42,
     ) -> dict[str, Any]:
         """Evaluate with a stratified train/test split.
 
+        When ``groups`` is provided, uses GroupShuffleSplit to ensure no
+        person appears in both train and test sets (person-aware splitting).
+        Otherwise falls back to a standard stratified split.
+
         Args:
             train_and_predict_fn: Callable (X_train, y_train, X_test) -> y_pred.
             X: Feature array.
             y: Labels.
+            groups: Optional group identifiers (e.g. person IDs) for
+                person-aware splitting.
             test_size: Fraction for test set.
             random_state: Random seed.
 
         Returns:
             Dictionary with accuracy, y_true, y_pred, classification report.
         """
-        from sklearn.model_selection import train_test_split
+        if groups is not None:
+            gss = GroupShuffleSplit(
+                n_splits=1, test_size=test_size, random_state=random_state
+            )
+            train_idx, test_idx = next(gss.split(X, y, groups))
+            X_train, X_test = X[train_idx], X[test_idx]
+            y_train, y_test = y[train_idx], y[test_idx]
+        else:
+            from sklearn.model_selection import train_test_split
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=random_state, stratify=y
-        )
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=test_size, random_state=random_state, stratify=y
+            )
 
         y_pred = np.asarray(train_and_predict_fn(X_train, y_train, X_test))
 

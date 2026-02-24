@@ -1,15 +1,18 @@
 /**
  * GestureController - MediaPipe HandLandmarker integration with
- * heuristic-based gesture classification.
+ * ONNX-based MLP gesture classification.
  *
- * Gestures detected:
+ * Gestures detected (via trained MLP model):
  *   "pinch"     - Thumb tip close to index tip
  *   "fist"      - All fingers curled
  *   "open_hand" - All fingers extended
- *   "frame"     - Two hands forming a rectangle (simplified: both hands detected)
- *   "none"      - No hand or low confidence
+ *   "frame"     - Two hands forming a rectangle (bypass: both hands detected)
+ *   "none"      - No hand or ambiguous pose
  */
 class GestureController {
+  // Label order matches sklearn LabelEncoder.fit() alphabetical sorting
+  static GESTURE_LABELS = ['fist', 'frame', 'none', 'open_hand', 'pinch'];
+
   /**
    * @param {HTMLVideoElement} videoElement
    * @param {function} onGestureChange - Called when gesture changes: (gesture, confidence, handPos)
@@ -21,6 +24,11 @@ class GestureController {
     this.handLandmarker = null;
     this.camera = null;
     this.running = false;
+
+    // ONNX inference session
+    this.session = null;
+    this._isInferring = false;
+    this._lastPrediction = { gesture: 'none', confidence: 0 };
 
     // Current state
     this._gesture = 'none';
@@ -44,7 +52,67 @@ class GestureController {
   }
 
   /**
-   * Initialize MediaPipe and start processing.
+   * Initialize detector only (MediaPipe + ONNX) without starting camera or loop.
+   * Use this when you manage the camera and render loop externally.
+   * After calling this, use detectRaw(video) per frame.
+   * @returns {Promise<void>}
+   */
+  async initDetector() {
+    const vision = await this._loadMediaPipe();
+    const { HandLandmarker, FilesetResolver } = vision;
+
+    const wasmFileset = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
+    );
+
+    this.handLandmarker = await HandLandmarker.createFromOptions(wasmFileset, {
+      baseOptions: {
+        modelAssetPath:
+          'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task',
+        delegate: 'GPU',
+      },
+      runningMode: 'VIDEO',
+      numHands: 2,
+      minHandDetectionConfidence: 0.5,
+      minHandPresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+
+    await this._initONNXSession();
+  }
+
+  /**
+   * Detect hands in a video frame. Returns raw MediaPipe results.
+   * Call this per-frame from your own render loop.
+   * @param {HTMLVideoElement} video
+   * @returns {object|null} MediaPipe detection results with .landmarks array
+   */
+  detectRaw(video) {
+    if (!this.handLandmarker || video.readyState < 2) return null;
+    return this.handLandmarker.detectForVideo(video, performance.now());
+  }
+
+  /**
+   * Classify a single hand's landmarks using ONNX (or heuristic fallback).
+   * @param {Array} landmarks - 21 MediaPipe hand landmarks
+   * @returns {Promise<{gesture: string, confidence: number}>}
+   */
+  async classifyLandmarksAsync(landmarks) {
+    if (this.session && !this._isInferring) {
+      this._isInferring = true;
+      try {
+        await this._runInference(landmarks);
+      } finally {
+        this._isInferring = false;
+      }
+      return { ...this._lastPrediction };
+    }
+    // Fallback to heuristic
+    return this._classifyGesture(landmarks);
+  }
+
+  /**
+   * Initialize MediaPipe, ONNX session, and start processing.
    * @returns {Promise<void>}
    */
   async init() {
@@ -70,10 +138,26 @@ class GestureController {
       minTrackingConfidence: 0.5,
     });
 
+    // Initialize ONNX inference session
+    await this._initONNXSession();
+
     // Start camera
     await this._startCamera();
     this.running = true;
     this._processLoop();
+  }
+
+  /** Initialize ONNX Runtime inference session. */
+  async _initONNXSession() {
+    try {
+      this.session = await ort.InferenceSession.create('./mlp_model.onnx', {
+        executionProviders: ['wasm'],
+      });
+      console.log('ONNX session initialized.');
+    } catch (e) {
+      console.warn('ONNX session failed to load, falling back to heuristic:', e);
+      this.session = null;
+    }
   }
 
   /** Dynamically import the MediaPipe vision module. */
@@ -120,6 +204,7 @@ class GestureController {
 
   /**
    * Process hand detection results.
+   * Uses ONNX inference when available, falls back to heuristic.
    * @param {object} results - MediaPipe HandLandmarker results
    */
   _processResults(results) {
@@ -138,22 +223,108 @@ class GestureController {
     // Mirror x since webcam is mirrored
     this._handPosition = { x: 1 - palm.x, y: palm.y };
 
-    // Classify gesture
-    const { gesture, confidence } = this._classifyGesture(landmarks);
-
-    // Check for frame gesture (two hands)
+    // Two-hand bypass: frame gesture
     if (results.landmarks.length >= 2) {
       this._updateGesture('frame', 0.9, this._handPosition);
-    } else {
-      this._updateGesture(gesture, confidence, this._handPosition);
+      this._drawOverlay(results.landmarks);
+      return;
     }
+
+    // Single hand: run ONNX inference (async, non-blocking)
+    if (this.session && !this._isInferring) {
+      this._isInferring = true;
+      this._runInference(landmarks).finally(() => {
+        this._isInferring = false;
+      });
+    } else if (!this.session) {
+      // Fallback to heuristic when ONNX is unavailable
+      const heuristic = this._classifyGesture(landmarks);
+      this._lastPrediction = heuristic;
+    }
+
+    // Use latest prediction (may be from previous frame if currently inferring)
+    this._updateGesture(
+      this._lastPrediction.gesture,
+      this._lastPrediction.confidence,
+      this._handPosition
+    );
 
     // Draw skeleton overlay
     this._drawOverlay(results.landmarks);
   }
 
   /**
-   * Heuristic gesture classifier based on finger curl detection.
+   * Run async ONNX inference on landmarks.
+   * @param {Array} landmarks - 21 MediaPipe hand landmarks
+   */
+  async _runInference(landmarks) {
+    try {
+      const inputData = this._preprocessLandmarks(landmarks);
+      if (!inputData) return;
+
+      const tensor = new ort.Tensor('float32', inputData, [1, 60]);
+      const results = await this.session.run({ input: tensor });
+      const probabilities = results.output.data;
+
+      // Find class with highest probability
+      let maxProb = -1;
+      let bestIdx = -1;
+      for (let i = 0; i < probabilities.length; i++) {
+        if (probabilities[i] > maxProb) {
+          maxProb = probabilities[i];
+          bestIdx = i;
+        }
+      }
+
+      this._lastPrediction = {
+        gesture: GestureController.GESTURE_LABELS[bestIdx],
+        confidence: maxProb,
+      };
+    } catch (error) {
+      console.error('Inference error:', error);
+    }
+  }
+
+  /**
+   * Preprocess 21 MediaPipe landmarks to match the Python training pipeline.
+   *
+   * Steps:
+   *   1. Translate all landmarks relative to the wrist (landmark 0).
+   *   2. Scale by the Euclidean distance from wrist to middle finger MCP (landmark 9).
+   *   3. Drop the wrist landmark (now all zeros).
+   *   4. Flatten to a 60-element Float32Array (20 landmarks x 3 coords).
+   *
+   * @param {Array} landmarks - Array of 21 {x, y, z} landmark objects
+   * @returns {Float32Array|null} - 60-dim preprocessed vector, or null if invalid
+   */
+  _preprocessLandmarks(landmarks) {
+    if (!landmarks || landmarks.length !== 21) return null;
+
+    const wrist = landmarks[0];
+    const middleMCP = landmarks[9];
+
+    // Distance from wrist to middle MCP (scaling factor)
+    const dx = middleMCP.x - wrist.x;
+    const dy = middleMCP.y - wrist.y;
+    const dz = middleMCP.z - wrist.z;
+    const scale = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1.0;
+
+    const out = new Float32Array(60);
+    let idx = 0;
+
+    // Start from landmark 1 (drop wrist)
+    for (let i = 1; i < landmarks.length; i++) {
+      const lm = landmarks[i];
+      out[idx++] = (lm.x - wrist.x) / scale;
+      out[idx++] = (lm.y - wrist.y) / scale;
+      out[idx++] = (lm.z - wrist.z) / scale;
+    }
+
+    return out;
+  }
+
+  /**
+   * Heuristic gesture classifier (fallback when ONNX is unavailable).
    * Uses distances between finger tips and palm base.
    *
    * Landmark indices (per hand):

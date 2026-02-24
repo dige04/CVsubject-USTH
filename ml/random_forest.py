@@ -15,8 +15,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 
 from features import compute_pairwise_distances_batch
-
-GESTURE_CLASSES = ["open_hand", "fist", "pinch", "frame", "none"]
+from preprocessing import GESTURE_CLASSES
 
 
 class RFClassifier:

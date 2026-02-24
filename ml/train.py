@@ -99,9 +99,9 @@ def train_heuristic(
         f"+/- {lopo_results['std_accuracy']:.4f}"
     )
 
-    # Stratified split
+    # Stratified split (person-aware)
     print("Running stratified split evaluation...")
-    split_results = evaluator.stratified_split(train_predict_fn, X, y)
+    split_results = evaluator.stratified_split(train_predict_fn, X, y, groups=person_ids)
     print(f"Stratified Split Accuracy: {split_results['accuracy']:.4f}")
 
     # Inference latency
@@ -182,9 +182,9 @@ def train_random_forest(
         f"+/- {lopo_results['std_accuracy']:.4f}"
     )
 
-    # Stratified split
+    # Stratified split (person-aware)
     print("Running stratified split evaluation...")
-    split_results = evaluator.stratified_split(train_predict_fn, X_dist, y)
+    split_results = evaluator.stratified_split(train_predict_fn, X_dist, y, groups=person_ids)
     print(f"Stratified Split Accuracy: {split_results['accuracy']:.4f}")
 
     # Train final model on all data for saving
@@ -268,6 +268,10 @@ def train_mlp(
     print(f"Input dimension: {X_mlp.shape[1]}")
 
     # LOPO-CV
+    # Note: MLP uses random validation_split for early stopping within each
+    # fold. The final evaluation uses the person-held-out test fold, so the
+    # early stopping split is a minor pragmatic compromise, not a data leak
+    # in the evaluation metric.
     def train_predict_fn(
         X_train: np.ndarray, y_train: np.ndarray, X_test: np.ndarray
     ) -> np.ndarray:
@@ -285,9 +289,9 @@ def train_mlp(
         f"+/- {lopo_results['std_accuracy']:.4f}"
     )
 
-    # Stratified split
+    # Stratified split (person-aware)
     print("Running stratified split evaluation...")
-    split_results = evaluator.stratified_split(train_predict_fn, X_mlp, y)
+    split_results = evaluator.stratified_split(train_predict_fn, X_mlp, y, groups=person_ids)
     print(f"Stratified Split Accuracy: {split_results['accuracy']:.4f}")
 
     # Train final model on all data

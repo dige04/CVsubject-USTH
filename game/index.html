@@ -3,85 +3,128 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jigsaw Puzzle - Gesture Control</title>
+  <title>Live Puzzle - Gesture Control</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="app">
 
-    <!-- Header -->
-    <header class="header">
-      <div class="header-title">Jigsaw Puzzle</div>
-      <div class="header-stats">
-        <div class="stat">
-          <span>Time:</span>
-          <span class="stat-value" id="timer">00:00</span>
-        </div>
-        <div class="stat">
-          <span>Moves:</span>
-          <span class="stat-value" id="moves">0</span>
-        </div>
-        <div class="stat">
-          <span>Done:</span>
-          <span class="stat-value" id="completion">0%</span>
-        </div>
-      </div>
-    </header>
+    <!-- Title bar -->
+    <div class="title-bar">
+      <h1 class="title">Live Puzzle</h1>
+      <p class="subtitle">Frame it to Snap. Pinch &amp; Drag to Swap.</p>
+    </div>
 
-    <!-- Main game area -->
-    <div class="main-area">
-      <canvas id="game-canvas"></canvas>
+    <!-- Full-screen game canvas -->
+    <canvas id="game-canvas"></canvas>
 
-      <!-- Webcam preview (hidden by default) -->
-      <div id="webcam-container" class="webcam-container hidden">
-        <video id="webcam" autoplay playsinline muted></video>
-        <canvas id="webcam-overlay" width="320" height="240"></canvas>
-        <span class="webcam-label">Camera</span>
-      </div>
+    <!-- Hidden video for camera feed -->
+    <video id="webcam" autoplay playsinline muted></video>
 
-      <!-- Keyboard hints -->
-      <div class="keyboard-hints">
-        <kbd>Click</kbd> Select / Drag piece<br>
-        <kbd>R</kbd> Rotate piece<br>
-        <kbd>S</kbd> Take snapshot
+    <!-- Timer HUD (top-center, visible during PLAYING) -->
+    <div id="hud-timer" class="hud-timer hidden">
+      <span class="timer-icon">&#9201;</span>
+      <span id="timer-value" class="timer-value">0:00</span>
+    </div>
+
+    <!-- Leaderboard button (top-left, visible during SCANNING) -->
+    <button id="btn-show-leaderboard" class="btn-show-leaderboard">
+      &#9776; Leaderboard
+    </button>
+
+    <!-- Instructions (top-right) -->
+    <div id="instructions" class="instructions-box">
+      <div id="instructions-content">
+        <p class="instr-phase">PHASE 1: CAPTURE</p>
+        <p>1. Form a frame with two hands</p>
+        <p>2. Pinch both hands to SNAP</p>
       </div>
     </div>
 
-    <!-- Footer / Controls -->
-    <footer class="footer">
-      <div class="footer-status">
-        <div class="gesture-info">
-          <span>Gesture:</span>
-          <span class="gesture-label" id="gesture-label">Mouse mode active</span>
-          <span class="confidence-label" id="confidence-label"></span>
-        </div>
-        <span class="mode-label" id="mode-label">Mouse Mode</span>
-      </div>
-      <div class="footer-controls">
-        <button class="btn btn-primary" id="btn-new-game">New Game</button>
-        <button class="btn" id="btn-camera">Camera On</button>
-        <select class="select" id="select-difficulty">
-          <option value="3">3 x 3 (Easy)</option>
-          <option value="4" selected>4 x 4 (Normal)</option>
-          <option value="5">5 x 5 (Hard)</option>
-          <option value="6">6 x 6 (Expert)</option>
-        </select>
-        <button class="btn" id="btn-upload">Upload Image</button>
-        <input type="file" id="file-input" class="file-input-hidden" accept="image/*">
-      </div>
-    </footer>
+    <!-- Reset button (bottom-left, visible during PLAYING) -->
+    <button id="btn-reset" class="btn-reset hidden" title="Reset Game">&#8634;</button>
 
-    <!-- Snapshot modal -->
-    <div id="snapshot-modal" class="snapshot-modal hidden">
-      <div class="snapshot-content">
-        <button class="snapshot-close" id="btn-close-snapshot">X</button>
-        <img id="snapshot-img" alt="Puzzle snapshot">
+    <!-- Hand hint (bottom-right, visible during PLAYING) -->
+    <div id="hand-hint" class="hand-hint hidden">
+      &#9995; Use Index+Thumb Pinch
+    </div>
+
+    <!-- Loading: camera -->
+    <div id="loading-camera" class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Initializing Camera...</p>
+    </div>
+
+    <!-- Loading: AI model -->
+    <div id="loading-ai" class="loading-ai hidden">
+      <div class="spinner-small"></div>
+      <span>Loading AI...</span>
+    </div>
+
+    <!-- Error overlay -->
+    <div id="error-overlay" class="error-overlay hidden">
+      <p class="error-title">Error</p>
+      <p id="error-message"></p>
+    </div>
+
+    <!-- Solved overlay -->
+    <div id="solved-overlay" class="solved-overlay hidden">
+      <div class="solved-content">
+        <div class="trophy">&#127942;</div>
+        <h2 class="solved-heading">COMPLETE!</h2>
+        <div class="solved-time-row">
+          <span class="solved-time-icon">&#9201;</span>
+          <span id="solved-time" class="solved-time-value">0:00</span>
+        </div>
+        <div class="solved-form">
+          <p class="solved-hint">Enter your name for the leaderboard</p>
+          <div class="solved-input-row">
+            <input type="text" id="player-name" class="input-name" placeholder="YOUR NAME" maxlength="10" autocomplete="off">
+            <button id="btn-submit-score" class="btn-submit" title="Submit">&rarr;</button>
+          </div>
+        </div>
+        <button id="btn-skip" class="btn-skip">Skip &amp; Play Again</button>
+      </div>
+    </div>
+
+    <!-- Leaderboard overlay -->
+    <div id="leaderboard-overlay" class="leaderboard-overlay hidden">
+      <div class="leaderboard-card">
+        <div class="leaderboard-header">
+          <div class="leaderboard-title-row">
+            <span class="lb-icon">&#9776;</span>
+            <h2 class="lb-title">Leaderboard</h2>
+          </div>
+        </div>
+        <div class="leaderboard-list">
+          <div class="lb-table-header">
+            <span>Rank</span>
+            <span>Player</span>
+            <span>Time</span>
+          </div>
+          <div id="leaderboard-body" class="lb-body">
+            <div class="lb-empty">No records yet. Be the first!</div>
+          </div>
+        </div>
+        <div id="personal-best-row" class="personal-best hidden">
+          <div class="pb-left">
+            <span class="pb-star">&#9733;</span>
+            <span class="pb-label">Your Best</span>
+          </div>
+          <span id="pb-time" class="pb-time">0:00</span>
+        </div>
+        <div class="leaderboard-footer">
+          <button id="btn-back-to-game" class="btn-accent-full">&#8634; Back to Game</button>
+        </div>
       </div>
     </div>
 
   </div>
 
-  <!-- Scripts: game.js and gesture.js are pure modules, main.js connects them -->
+  <!-- ONNX Runtime Web for ML inference -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+
+  <!-- Scripts -->
   <script src="game.js"></script>
   <script src="gesture.js"></script>
   <script src="main.js"></script>

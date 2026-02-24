@@ -14,7 +14,7 @@ from typing import Any
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
-GESTURE_CLASSES = ["open_hand", "fist", "pinch", "frame", "none"]
+from preprocessing import GESTURE_CLASSES
 
 
 def _build_model(input_dim: int = 60, num_classes: int = 5, lr: float = 1e-3) -> Any:
@@ -92,6 +92,7 @@ class MLPClassifier:
         y_labels: np.ndarray,
         epochs: int = 100,
         batch_size: int = 32,
+        validation_data: tuple[np.ndarray, np.ndarray] | None = None,
         validation_split: float = 0.15,
         patience: int = 10,
         verbose: int = 1,
@@ -99,13 +100,19 @@ class MLPClassifier:
         """Train the MLP on normalized landmark vectors.
 
         Uses early stopping on validation loss to prevent overfitting.
+        When ``validation_data`` is provided (e.g. a person-aware held-out
+        set), it is used instead of the random ``validation_split``.
 
         Args:
             X_normalized: Array of shape (n_samples, 60).
             y_labels: String labels of shape (n_samples,).
             epochs: Maximum number of training epochs.
             batch_size: Mini-batch size.
-            validation_split: Fraction of training data for validation.
+            validation_data: Optional (X_val, y_val_labels) tuple for
+                person-aware validation. When provided, ``validation_split``
+                is ignored.
+            validation_split: Fraction of training data for validation
+                (used only when ``validation_data`` is None).
             patience: Early stopping patience (epochs without improvement).
             verbose: Keras verbosity level (0=silent, 1=progress, 2=minimal).
 
@@ -127,15 +134,21 @@ class MLPClassifier:
             ),
         ]
 
-        self.history = self.model.fit(
-            X_normalized,
-            y_encoded,
-            epochs=epochs,
-            batch_size=batch_size,
-            validation_split=validation_split,
-            callbacks=callbacks,
-            verbose=verbose,
-        )
+        fit_kwargs: dict[str, Any] = {
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "callbacks": callbacks,
+            "verbose": verbose,
+        }
+
+        if validation_data is not None:
+            X_val, y_val_labels = validation_data
+            y_val_encoded = self.label_encoder.transform(y_val_labels)
+            fit_kwargs["validation_data"] = (X_val, y_val_encoded)
+        else:
+            fit_kwargs["validation_split"] = validation_split
+
+        self.history = self.model.fit(X_normalized, y_encoded, **fit_kwargs)
         self._is_trained = True
 
         # Return summary metrics

@@ -15,8 +15,7 @@ from features import (
     compute_key_distances,
     FINGER_NAMES,
 )
-
-GESTURE_CLASSES = ["open_hand", "fist", "pinch", "frame", "none"]
+from preprocessing import GESTURE_CLASSES
 
 
 class HeuristicClassifier:

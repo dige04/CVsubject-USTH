@@ -1,435 +1,762 @@
 /**
- * main.js - Entry point. Connects PuzzleGame with GestureController
- * and sets up keyboard/mouse fallback controls.
+ * main.js - Live Puzzle controller.
+ * Full-screen camera, hand gesture interaction, swap puzzle.
+ *
+ * States: SCANNING -> PLAYING -> SOLVED -> LEADERBOARD
+ *
+ * Uses GestureController (gesture.js) for MediaPipe + ONNX detection,
+ * and SwapPuzzle (game.js) for puzzle state + rendering.
  */
 (function () {
   'use strict';
 
   // ---------------------------------------------------------------
-  // Sample image: a colorful gradient (base64-encoded PNG, 400x300)
-  // Generated procedurally as a canvas-drawn gradient then exported.
-  // We'll generate it dynamically instead of embedding a huge base64.
+  // Constants
   // ---------------------------------------------------------------
-  function generateSampleImage() {
-    const c = document.createElement('canvas');
-    c.width = 400;
-    c.height = 300;
-    const ctx = c.getContext('2d');
+  const PINCH_THRESHOLD = 0.05;
+  const FRAME_THRESHOLD = 0.1;
+  const RESET_DWELL_MS = 1500;
+  const ROWS = 3;
+  const COLS = 3;
 
-    // Multi-color gradient background
-    const g1 = ctx.createLinearGradient(0, 0, 400, 300);
-    g1.addColorStop(0, '#ff6b6b');
-    g1.addColorStop(0.25, '#feca57');
-    g1.addColorStop(0.5, '#48dbfb');
-    g1.addColorStop(0.75, '#ff9ff3');
-    g1.addColorStop(1, '#54a0ff');
-    ctx.fillStyle = g1;
-    ctx.fillRect(0, 0, 400, 300);
+  // Hand skeleton connection pairs
+  const HAND_CONNECTIONS = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [0,9],[9,10],[10,11],[11,12],
+    [0,13],[13,14],[14,15],[15,16],
+    [0,17],[17,18],[18,19],[19,20],
+    [5,9],[9,13],[13,17],
+  ];
 
-    // Add some shapes for visual interest
-    ctx.globalAlpha = 0.3;
+  // Leaderboard keys
+  const LB_KEY = 'live-puzzle-leaderboard';
+  const NAME_KEY = 'live-puzzle-player-name';
+  const PB_KEY = 'live-puzzle-personal-best';
 
-    // Circles
-    const colors = ['#fff', '#2d3436', '#6c5ce7', '#00b894', '#fdcb6e'];
-    for (let i = 0; i < 12; i++) {
-      ctx.beginPath();
-      ctx.arc(
-        50 + Math.random() * 300,
-        30 + Math.random() * 240,
-        15 + Math.random() * 40,
-        0,
-        Math.PI * 2
-      );
-      ctx.fillStyle = colors[i % colors.length];
-      ctx.fill();
-    }
+  // ---------------------------------------------------------------
+  // State
+  // ---------------------------------------------------------------
+  let gameState = 'SCANNING'; // SCANNING | PLAYING | SOLVED | LEADERBOARD
+  let tiles = [];
+  let puzzleImageCanvas = null; // Captured image as HTMLCanvasElement
+  let boardCoords = null;       // { minX, maxX, minY, maxY } in normalized coords
+  let timeElapsed = 0;
+  let startTime = null;
+  let timerInterval = null;
 
-    // Grid pattern
-    ctx.globalAlpha = 0.08;
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < 400; x += 20) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, 300);
-      ctx.stroke();
-    }
-    for (let y = 0; y < 300; y += 20) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(400, y);
-      ctx.stroke();
-    }
+  // Interaction
+  let smoothCursor = { x: 0, y: 0 };
+  let isDragging = false;
+  let dragTileIndex = null;
+  let lastPinchTime = 0;
+  let lastFrameCoords = null;
+  let fistHoldStart = null;
 
-    // Text
-    ctx.globalAlpha = 0.15;
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 60px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('PUZZLE', 200, 130);
-    ctx.font = 'bold 40px sans-serif';
-    ctx.fillText('GAME', 200, 190);
-
-    ctx.globalAlpha = 1;
-
-    return c.toDataURL('image/png');
-  }
+  // Gesture controller
+  let gestureCtrl = null;
+  let cameraReady = false;
+  let modelLoaded = false;
 
   // ---------------------------------------------------------------
   // DOM references
   // ---------------------------------------------------------------
-  const gameCanvas = document.getElementById('game-canvas');
-  const videoEl = document.getElementById('webcam');
-  const overlayCanvas = document.getElementById('webcam-overlay');
-  const timerEl = document.getElementById('timer');
-  const movesEl = document.getElementById('moves');
-  const completionEl = document.getElementById('completion');
-  const gestureEl = document.getElementById('gesture-label');
-  const confidenceEl = document.getElementById('confidence-label');
-  const modeEl = document.getElementById('mode-label');
-  const btnNewGame = document.getElementById('btn-new-game');
-  const btnCamera = document.getElementById('btn-camera');
-  const selectDifficulty = document.getElementById('select-difficulty');
-  const btnUpload = document.getElementById('btn-upload');
-  const fileInput = document.getElementById('file-input');
-  const webcamContainer = document.getElementById('webcam-container');
-  const snapshotModal = document.getElementById('snapshot-modal');
-  const snapshotImg = document.getElementById('snapshot-img');
-  const btnCloseSnapshot = document.getElementById('btn-close-snapshot');
+  const canvas = document.getElementById('game-canvas');
+  const ctx = canvas.getContext('2d');
+  const video = document.getElementById('webcam');
+
+  // HUD
+  const hudTimer = document.getElementById('hud-timer');
+  const timerValue = document.getElementById('timer-value');
+  const btnShowLeaderboard = document.getElementById('btn-show-leaderboard');
+  const instructionsContent = document.getElementById('instructions-content');
+  const btnReset = document.getElementById('btn-reset');
+  const handHint = document.getElementById('hand-hint');
+
+  // Loading / Error
+  const loadingCamera = document.getElementById('loading-camera');
+  const loadingAi = document.getElementById('loading-ai');
+  const errorOverlay = document.getElementById('error-overlay');
+  const errorMessage = document.getElementById('error-message');
+
+  // Solved overlay
+  const solvedOverlay = document.getElementById('solved-overlay');
+  const solvedTime = document.getElementById('solved-time');
+  const playerNameInput = document.getElementById('player-name');
+  const btnSubmitScore = document.getElementById('btn-submit-score');
+  const btnSkip = document.getElementById('btn-skip');
+
+  // Leaderboard overlay
+  const leaderboardOverlay = document.getElementById('leaderboard-overlay');
+  const leaderboardBody = document.getElementById('leaderboard-body');
+  const personalBestRow = document.getElementById('personal-best-row');
+  const pbTimeEl = document.getElementById('pb-time');
+  const btnBackToGame = document.getElementById('btn-back-to-game');
 
   // ---------------------------------------------------------------
-  // Canvas sizing
+  // Utilities
   // ---------------------------------------------------------------
-  function resizeCanvas() {
-    const container = gameCanvas.parentElement;
-    const rect = container.getBoundingClientRect();
-    gameCanvas.width = rect.width;
-    gameCanvas.height = rect.height;
-    if (game && game.imageLoaded) {
-      game.resize(rect.width, rect.height);
-    }
+  function formatTime(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return mins + ':' + secs.toString().padStart(2, '0');
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
   }
 
   // ---------------------------------------------------------------
-  // Initialize game
+  // Leaderboard (localStorage)
   // ---------------------------------------------------------------
-  let game = null;
-  let gestureCtrl = null;
-  let cameraActive = false;
-  let currentImageUrl = null;
-
-  async function initGame(imageUrl, gridSize) {
-    if (game) game.destroy();
-
-    resizeCanvas();
-
-    game = new PuzzleGame('game-canvas', gridSize || 4);
-
-    game.onStateChange = (state) => {
-      timerEl.textContent = formatTime(state.time);
-      movesEl.textContent = state.moves;
-      completionEl.textContent = state.completion + '%';
-    };
-
-    game.onWin = (state) => {
-      // Brief delay so the player sees the final state
-      setTimeout(() => {
-        updateStatusText('Puzzle Complete! Well done!', '#4caf50');
-      }, 500);
-    };
-
-    currentImageUrl = imageUrl;
-    await game.loadImage(imageUrl);
-  }
-
-  function formatTime(seconds) {
-    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-    const s = (seconds % 60).toString().padStart(2, '0');
-    return m + ':' + s;
-  }
-
-  function updateStatusText(text, color) {
-    gestureEl.textContent = text;
-    if (color) gestureEl.style.color = color;
-  }
-
-  // ---------------------------------------------------------------
-  // Mouse / Keyboard controls
-  // ---------------------------------------------------------------
-  let isDragging = false;
-
-  function getCanvasPos(e) {
-    const rect = gameCanvas.getBoundingClientRect();
-    return {
-      x: (e.clientX - rect.left) * (gameCanvas.width / rect.width),
-      y: (e.clientY - rect.top) * (gameCanvas.height / rect.height),
-    };
-  }
-
-  gameCanvas.addEventListener('mousedown', (e) => {
-    if (!game || game.won) return;
-    const pos = getCanvasPos(e);
-    const piece = game.selectPiece(pos.x, pos.y);
-    if (piece) {
-      isDragging = true;
-      gameCanvas.style.cursor = 'grabbing';
-    }
-  });
-
-  gameCanvas.addEventListener('mousemove', (e) => {
-    if (!isDragging || !game) return;
-    const pos = getCanvasPos(e);
-    game.movePiece(pos.x, pos.y);
-  });
-
-  gameCanvas.addEventListener('mouseup', () => {
-    if (!isDragging || !game) return;
-    isDragging = false;
-    gameCanvas.style.cursor = 'grab';
-    const result = game.releasePiece();
-    if (result.snapped) {
-      updateStatusText('Snapped!', '#4caf50');
-      setTimeout(() => updateStatusText(cameraActive ? 'Gesture Mode' : 'Mouse Mode', '#a0a0a0'), 800);
-    }
-  });
-
-  gameCanvas.addEventListener('mouseleave', () => {
-    if (isDragging && game) {
-      isDragging = false;
-      gameCanvas.style.cursor = 'grab';
-      game.releasePiece();
-    }
-  });
-
-  // Touch support
-  gameCanvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    if (!game || game.won) return;
-    const touch = e.touches[0];
-    const pos = getCanvasPos(touch);
-    const piece = game.selectPiece(pos.x, pos.y);
-    if (piece) isDragging = true;
-  }, { passive: false });
-
-  gameCanvas.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    if (!isDragging || !game) return;
-    const touch = e.touches[0];
-    const pos = getCanvasPos(touch);
-    game.movePiece(pos.x, pos.y);
-  }, { passive: false });
-
-  gameCanvas.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    if (!isDragging || !game) return;
-    isDragging = false;
-    game.releasePiece();
-  }, { passive: false });
-
-  // Keyboard
-  document.addEventListener('keydown', (e) => {
-    if (!game) return;
-
-    switch (e.key.toLowerCase()) {
-      case 'r':
-        if (game.selectedPiece) {
-          game.rotatePiece();
-        }
-        break;
-      case 's':
-        takeSnapshot();
-        break;
-    }
-  });
-
-  // ---------------------------------------------------------------
-  // Gesture controller integration
-  // ---------------------------------------------------------------
-  let gestureState = {
-    wasGrabbing: false,
-    lastGesture: 'none',
-  };
-
-  async function startCamera() {
-    if (gestureCtrl) {
-      gestureCtrl.destroy();
-      gestureCtrl = null;
-    }
-
-    webcamContainer.classList.remove('hidden');
-    btnCamera.textContent = 'Camera Off';
-
+  function loadLeaderboard() {
     try {
-      gestureCtrl = new GestureController(videoEl, handleGesture);
-      gestureCtrl.setOverlayCanvas(overlayCanvas);
-      await gestureCtrl.init();
-      cameraActive = true;
-      modeEl.textContent = 'Gesture Mode';
-      updateStatusText('Camera active - show your hand', '#64b5f6');
+      return JSON.parse(localStorage.getItem(LB_KEY)) || [];
+    } catch { return []; }
+  }
+
+  function saveLeaderboard(entries) {
+    localStorage.setItem(LB_KEY, JSON.stringify(entries));
+  }
+
+  function addEntry(name, time) {
+    const entries = loadLeaderboard();
+    entries.push({ name, time, date: Date.now() });
+    entries.sort((a, b) => a.time - b.time);
+    const trimmed = entries.slice(0, 50);
+    saveLeaderboard(trimmed);
+    return trimmed;
+  }
+
+  function getPersonalBest() {
+    const val = localStorage.getItem(PB_KEY);
+    return val ? parseInt(val, 10) : null;
+  }
+
+  function setPersonalBest(time) {
+    const current = getPersonalBest();
+    if (current === null || time < current) {
+      localStorage.setItem(PB_KEY, time.toString());
+    }
+  }
+
+  function getSavedName() {
+    return localStorage.getItem(NAME_KEY) || '';
+  }
+
+  function setSavedName(name) {
+    localStorage.setItem(NAME_KEY, name);
+  }
+
+  // ---------------------------------------------------------------
+  // UI State Management
+  // ---------------------------------------------------------------
+  function updateUI() {
+    // Timer
+    hudTimer.classList.toggle('hidden', gameState !== 'PLAYING');
+    if (gameState === 'PLAYING') {
+      timerValue.textContent = formatTime(timeElapsed);
+    }
+
+    // Leaderboard button
+    btnShowLeaderboard.classList.toggle('hidden', gameState !== 'SCANNING');
+
+    // Reset button & hand hint
+    btnReset.classList.toggle('hidden', gameState !== 'PLAYING');
+    handHint.classList.toggle('hidden', gameState !== 'PLAYING');
+
+    // Loading
+    loadingCamera.classList.toggle('hidden', cameraReady);
+    loadingAi.classList.toggle('hidden', modelLoaded || !cameraReady);
+
+    // Instructions
+    updateInstructions();
+  }
+
+  function updateInstructions() {
+    let html = '';
+    switch (gameState) {
+      case 'SCANNING':
+        html = '<p class="instr-phase">PHASE 1: CAPTURE</p>' +
+               '<p>1. Form a frame with two hands</p>' +
+               '<p>2. Pinch both hands to SNAP</p>';
+        break;
+      case 'PLAYING':
+        html = '<p class="instr-phase">PHASE 2: SOLVE</p>' +
+               '<p>1. Pinch to Pick Up</p>' +
+               '<p>2. Drag & Drop to Swap</p>' +
+               '<p style="color:var(--accent);margin-top:6px">Hold Fist to Reset</p>';
+        break;
+      case 'SOLVED':
+        html = '<p class="instr-phase">PUZZLE SOLVED!</p>';
+        break;
+      case 'LEADERBOARD':
+        html = '<p class="instr-phase">TOP PLAYERS</p>';
+        break;
+    }
+    instructionsContent.innerHTML = html;
+  }
+
+  function showError(msg) {
+    errorMessage.textContent = msg;
+    errorOverlay.classList.remove('hidden');
+  }
+
+  // ---------------------------------------------------------------
+  // Camera
+  // ---------------------------------------------------------------
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+      });
+      video.srcObject = stream;
+      await new Promise((resolve) => {
+        video.onloadedmetadata = () => {
+          video.play().then(resolve);
+        };
+      });
+      cameraReady = true;
+      updateUI();
     } catch (err) {
-      console.error('Camera init failed:', err);
-      cameraActive = false;
-      webcamContainer.classList.add('hidden');
-      btnCamera.textContent = 'Camera On';
-      modeEl.textContent = 'Mouse Mode';
-      updateStatusText('Camera unavailable - using mouse', '#ff8a65');
+      showError('Camera access denied. Please allow camera access and reload.');
     }
   }
 
-  function stopCamera() {
-    if (gestureCtrl) {
-      gestureCtrl.destroy();
-      gestureCtrl = null;
+  // ---------------------------------------------------------------
+  // MediaPipe + ONNX initialization
+  // ---------------------------------------------------------------
+  async function initDetection() {
+    try {
+      gestureCtrl = new GestureController(video, null);
+      await gestureCtrl.initDetector();
+      modelLoaded = true;
+      updateUI();
+    } catch (err) {
+      console.error('Detection init failed:', err);
+      showError('AI model failed to load.');
     }
-    cameraActive = false;
-    webcamContainer.classList.add('hidden');
-    btnCamera.textContent = 'Camera On';
-    modeEl.textContent = 'Mouse Mode';
-    updateStatusText('Mouse mode active', '#a0a0a0');
-    gestureState.wasGrabbing = false;
-    gestureState.lastGesture = 'none';
-  }
-
-  /**
-   * Map gestures to game actions.
-   * @param {string} gesture
-   * @param {number} confidence
-   * @param {{ x: number, y: number }|null} handPos
-   */
-  function handleGesture(gesture, confidence, handPos) {
-    if (!game || game.won) return;
-
-    // Update UI
-    const gestureLabels = {
-      pinch: 'Pinch (Grab)',
-      fist: 'Fist (Rotate)',
-      open_hand: 'Open Hand (Release)',
-      frame: 'Frame (Snapshot)',
-      none: 'No gesture',
-    };
-    gestureEl.textContent = gestureLabels[gesture] || gesture;
-    gestureEl.style.color = gesture === 'none' ? '#666' : '#64b5f6';
-    confidenceEl.textContent = Math.round(confidence * 100) + '%';
-
-    if (!handPos) return;
-
-    // Convert normalized hand position to canvas coordinates
-    const cx = handPos.x * gameCanvas.width;
-    const cy = handPos.y * gameCanvas.height;
-
-    switch (gesture) {
-      case 'pinch':
-        if (!gestureState.wasGrabbing) {
-          // Start grabbing
-          const piece = game.selectPiece(cx, cy);
-          if (piece) {
-            gestureState.wasGrabbing = true;
-          }
-        } else {
-          // Continue dragging
-          game.movePiece(cx, cy);
-        }
-        break;
-
-      case 'open_hand':
-        if (gestureState.wasGrabbing) {
-          game.releasePiece();
-          gestureState.wasGrabbing = false;
-        }
-        break;
-
-      case 'fist':
-        if (gestureState.lastGesture !== 'fist' && game.selectedPiece) {
-          game.rotatePiece();
-        }
-        break;
-
-      case 'frame':
-        if (gestureState.lastGesture !== 'frame') {
-          takeSnapshot();
-        }
-        break;
-    }
-
-    gestureState.lastGesture = gesture;
   }
 
   // ---------------------------------------------------------------
-  // Snapshot
+  // Frame capture
   // ---------------------------------------------------------------
-  function takeSnapshot() {
-    if (!game) return;
-    const dataUrl = game.takeSnapshot();
-    snapshotImg.src = dataUrl;
-    snapshotModal.classList.remove('hidden');
+  function captureFrame(width, height) {
+    const offscreen = document.createElement('canvas');
+    offscreen.width = width;
+    offscreen.height = height;
+    const octx = offscreen.getContext('2d');
+    // Draw video mirrored
+    octx.translate(width, 0);
+    octx.scale(-1, 1);
+    octx.drawImage(video, 0, 0, width, height);
+    return offscreen;
   }
 
-  btnCloseSnapshot.addEventListener('click', () => {
-    snapshotModal.classList.add('hidden');
-  });
-
-  snapshotModal.addEventListener('click', (e) => {
-    if (e.target === snapshotModal) {
-      snapshotModal.classList.add('hidden');
-    }
-  });
-
   // ---------------------------------------------------------------
-  // UI controls
+  // Game actions
   // ---------------------------------------------------------------
-  btnNewGame.addEventListener('click', () => {
-    const size = parseInt(selectDifficulty.value, 10) || 4;
-    const imgUrl = currentImageUrl || generateSampleImage();
-    initGame(imgUrl, size);
-    if (game && game.won) game.won = false;
-    updateStatusText(cameraActive ? 'Gesture Mode' : 'Mouse Mode', '#a0a0a0');
-  });
+  function resetGame() {
+    gameState = 'SCANNING';
+    tiles = [];
+    puzzleImageCanvas = null;
+    boardCoords = null;
+    isDragging = false;
+    dragTileIndex = null;
+    fistHoldStart = null;
+    timeElapsed = 0;
+    startTime = null;
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    solvedOverlay.classList.add('hidden');
+    leaderboardOverlay.classList.add('hidden');
+    updateUI();
+  }
 
-  btnCamera.addEventListener('click', () => {
-    if (cameraActive) {
-      stopCamera();
+  function startPlaying() {
+    gameState = 'PLAYING';
+    startTime = Date.now();
+    timerInterval = setInterval(() => {
+      timeElapsed = Date.now() - startTime;
+      timerValue.textContent = formatTime(timeElapsed);
+    }, 100);
+    updateUI();
+  }
+
+  function onSolved() {
+    gameState = 'SOLVED';
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    solvedTime.textContent = formatTime(timeElapsed);
+    solvedOverlay.classList.remove('hidden');
+
+    const savedName = getSavedName();
+    if (savedName) playerNameInput.value = savedName;
+    playerNameInput.focus();
+
+    updateUI();
+  }
+
+  function submitScore() {
+    const name = playerNameInput.value.trim().toUpperCase();
+    if (!name) return;
+
+    setSavedName(name);
+    setPersonalBest(timeElapsed);
+    addEntry(name, timeElapsed);
+
+    solvedOverlay.classList.add('hidden');
+    showLeaderboard();
+  }
+
+  function showLeaderboard() {
+    gameState = 'LEADERBOARD';
+    renderLeaderboard();
+    leaderboardOverlay.classList.remove('hidden');
+    updateUI();
+  }
+
+  function renderLeaderboard() {
+    const entries = loadLeaderboard();
+    const currentName = getSavedName();
+
+    if (entries.length === 0) {
+      leaderboardBody.innerHTML = '<div class="lb-empty">No records yet. Be the first!</div>';
     } else {
-      startCamera();
+      let html = '';
+      entries.forEach((entry, i) => {
+        const isMe = entry.name === currentName;
+        html += `<div class="lb-entry${isMe ? ' highlight' : ''}">
+          <div class="lb-entry-left">
+            <span class="lb-rank${i === 0 ? ' first' : ''}">#${i + 1}</span>
+            <span class="lb-player${isMe ? ' highlight' : ''}">${escapeHtml(entry.name)}</span>
+          </div>
+          <span class="lb-time">${formatTime(entry.time)}</span>
+        </div>`;
+      });
+      leaderboardBody.innerHTML = html;
     }
-  });
 
-  selectDifficulty.addEventListener('change', () => {
-    const size = parseInt(selectDifficulty.value, 10) || 4;
-    const imgUrl = currentImageUrl || generateSampleImage();
-    initGame(imgUrl, size);
-  });
-
-  btnUpload.addEventListener('click', () => {
-    fileInput.click();
-  });
-
-  fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const size = parseInt(selectDifficulty.value, 10) || 4;
-      initGame(ev.target.result, size);
-    };
-    reader.readAsDataURL(file);
-  });
+    // Personal best
+    const pb = getPersonalBest();
+    if (pb !== null) {
+      personalBestRow.classList.remove('hidden');
+      pbTimeEl.textContent = formatTime(pb);
+    } else {
+      personalBestRow.classList.add('hidden');
+    }
+  }
 
   // ---------------------------------------------------------------
-  // Window resize handling
+  // Hand analysis helpers
   // ---------------------------------------------------------------
-  let resizeTimeout;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(() => {
-      resizeCanvas();
-    }, 150);
+  function pinchDistance(hand) {
+    const thumb = hand[4];
+    const index = hand[8];
+    return Math.hypot(thumb.x - index.x, thumb.y - index.y);
+  }
+
+  function isPinching(hand) {
+    return pinchDistance(hand) < PINCH_THRESHOLD;
+  }
+
+  function isFrameGesture(hand) {
+    // Thumb and index spread apart
+    return Math.hypot(hand[8].x - hand[4].x, hand[8].y - hand[4].y) > FRAME_THRESHOLD;
+  }
+
+  function isFist(hand) {
+    const wrist = hand[0];
+    const tips = [8, 12, 16, 20];
+    const pips = [6, 10, 14, 18];
+    let closed = 0;
+    for (let i = 0; i < tips.length; i++) {
+      const tip = hand[tips[i]];
+      const pip = hand[pips[i]];
+      const dTip = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+      const dPip = Math.hypot(pip.x - wrist.x, pip.y - wrist.y);
+      if (dTip < dPip) closed++;
+    }
+    return closed === 4;
+  }
+
+  // ---------------------------------------------------------------
+  // Skeleton drawing
+  // ---------------------------------------------------------------
+  function drawSkeleton(allLandmarks, width, height) {
+    for (const landmarks of allLandmarks) {
+      // Draw connections
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      for (const [a, b] of HAND_CONNECTIONS) {
+        ctx.beginPath();
+        ctx.moveTo((1 - landmarks[a].x) * width, landmarks[a].y * height);
+        ctx.lineTo((1 - landmarks[b].x) * width, landmarks[b].y * height);
+        ctx.stroke();
+      }
+      // Draw joints
+      for (let i = 0; i < landmarks.length; i++) {
+        const lm = landmarks[i];
+        ctx.beginPath();
+        ctx.arc((1 - lm.x) * width, lm.y * height, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Main render loop
+  // ---------------------------------------------------------------
+  function renderLoop() {
+    if (!canvas || !cameraReady) {
+      requestAnimationFrame(renderLoop);
+      return;
+    }
+
+    if (video.readyState < 2) {
+      requestAnimationFrame(renderLoop);
+      return;
+    }
+
+    // Match canvas to video size
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    }
+
+    const width = canvas.width;
+    const height = canvas.height;
+    ctx.clearRect(0, 0, width, height);
+
+    // Detect hands
+    let results = null;
+    if (gestureCtrl && modelLoaded) {
+      results = gestureCtrl.detectRaw(video);
+    }
+
+    // ---- SCANNING / LEADERBOARD ----
+    if (gameState === 'SCANNING' || gameState === 'LEADERBOARD') {
+      // Draw mirrored camera
+      ctx.save();
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, width, height);
+      ctx.restore();
+
+      if (gameState === 'SCANNING') {
+        handleScanning(results, width, height);
+      }
+    }
+
+    // ---- PLAYING / SOLVED ----
+    else if ((gameState === 'PLAYING' || gameState === 'SOLVED') && puzzleImageCanvas && boardCoords) {
+      // Draw mirrored camera background
+      ctx.save();
+      ctx.translate(width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0, width, height);
+      ctx.restore();
+
+      handlePlaying(results, width, height);
+    }
+
+    // Draw skeleton (except during leaderboard)
+    if (results && results.landmarks && results.landmarks.length > 0 && gameState !== 'LEADERBOARD') {
+      drawSkeleton(results.landmarks, width, height);
+    }
+
+    requestAnimationFrame(renderLoop);
+  }
+
+  // ---------------------------------------------------------------
+  // SCANNING handler
+  // ---------------------------------------------------------------
+  function handleScanning(results, width, height) {
+    if (!results || !results.landmarks || results.landmarks.length < 2) {
+      lastFrameCoords = null; // Clear stale frame when fewer than 2 hands
+      return;
+    }
+
+    const h1 = results.landmarks[0];
+    const h2 = results.landmarks[1];
+
+    const d1 = Math.hypot(h1[8].x - h1[4].x, h1[8].y - h1[4].y);
+    const d2 = Math.hypot(h2[8].x - h2[4].x, h2[8].y - h2[4].y);
+
+    let validFrame = false;
+
+    // Frame detection: both hands have spread thumb-index
+    if (d1 > FRAME_THRESHOLD && d2 > FRAME_THRESHOLD) {
+      const allX = [h1[8].x, h1[4].x, h2[8].x, h2[4].x];
+      const allY = [h1[8].y, h1[4].y, h2[8].y, h2[4].y];
+      lastFrameCoords = {
+        minX: Math.min(...allX),
+        maxX: Math.max(...allX),
+        minY: Math.min(...allY),
+        maxY: Math.max(...allY),
+      };
+      validFrame = true;
+    }
+
+    // Pinch capture: both hands pinch while frame was established
+    if (d1 < PINCH_THRESHOLD && d2 < PINCH_THRESHOLD && lastFrameCoords) {
+      const now = Date.now();
+      if (now - lastPinchTime > 1000) {
+        lastPinchTime = now;
+        captureAndStartGame(width, height);
+      }
+    }
+
+    // Draw frame overlay
+    if (lastFrameCoords && validFrame) {
+      const c = lastFrameCoords;
+      const sx = (1 - c.maxX) * width;
+      const ex = (1 - c.minX) * width;
+      const sy = c.minY * height;
+      const ey = c.maxY * height;
+
+      ctx.strokeStyle = '#ccff00';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(sx, sy, ex - sx, ey - sy);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px monospace';
+      ctx.fillText('PINCH TO CAPTURE', sx, sy - 8);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Capture framed area and start game
+  // ---------------------------------------------------------------
+  function captureAndStartGame(width, height) {
+    const c = lastFrameCoords;
+    const fullFrame = captureFrame(width, height);
+
+    // Calculate crop area from frame coordinates
+    const sx = (1 - c.maxX) * width;
+    const sy = c.minY * height;
+    const sw = ((1 - c.minX) * width) - sx;
+    const sh = (c.maxY * height) - sy;
+
+    if (sw <= 0 || sh <= 0) return;
+
+    // Create cropped image canvas
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = sw * 2;
+    cropCanvas.height = sh * 2;
+    const cropCtx = cropCanvas.getContext('2d');
+    if (cropCtx) {
+      cropCtx.drawImage(fullFrame, sx, sy, sw, sh, 0, 0, cropCanvas.width, cropCanvas.height);
+    }
+
+    puzzleImageCanvas = cropCanvas;
+    tiles = SwapPuzzle.generate(COLS, ROWS);
+    boardCoords = { ...c };
+    startPlaying();
+  }
+
+  // ---------------------------------------------------------------
+  // PLAYING handler
+  // ---------------------------------------------------------------
+  function handlePlaying(results, width, height) {
+    const c = boardCoords;
+    const boardSX = (1 - c.maxX) * width;
+    const boardSY = c.minY * height;
+    const boardW = ((1 - c.minX) * width) - boardSX;
+    const boardH = (c.maxY * height) - boardSY;
+
+    let hoverIndex = null;
+    let pinching = false;
+    let interactingHand = null;
+
+    // Process hand input
+    if (results && results.landmarks && results.landmarks.length > 0) {
+      const hand = results.landmarks[0];
+      interactingHand = hand;
+
+      const indexTip = hand[8];
+      const thumbTip = hand[4];
+
+      // Raw pointer position (mirrored)
+      const rawX = (1 - (indexTip.x + thumbTip.x) / 2) * width;
+      const rawY = ((indexTip.y + thumbTip.y) / 2) * height;
+
+      // Pinch state
+      const dist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+      pinching = dist < PINCH_THRESHOLD;
+
+      // Smooth cursor (lerp based on distance)
+      const distMove = Math.hypot(rawX - smoothCursor.x, rawY - smoothCursor.y);
+      const alpha = distMove > 100 ? 1.0 : 0.4;
+      smoothCursor.x = smoothCursor.x * (1 - alpha) + rawX * alpha;
+      smoothCursor.y = smoothCursor.y * (1 - alpha) + rawY * alpha;
+    }
+
+    const cursorX = smoothCursor.x;
+    const cursorY = smoothCursor.y;
+
+    // Calculate tile under cursor
+    const relX = cursorX - boardSX;
+    const relY = cursorY - boardSY;
+    if (relX >= 0 && relX <= boardW && relY >= 0 && relY <= boardH) {
+      const col = Math.floor(relX / (boardW / COLS));
+      const row = Math.floor(relY / (boardH / ROWS));
+      if (col >= 0 && col < COLS && row >= 0 && row < ROWS) {
+        hoverIndex = row * COLS + col;
+      }
+    }
+
+    // Drag & drop logic (only during PLAYING)
+    if (gameState === 'PLAYING') {
+      if (pinching) {
+        if (!isDragging && hoverIndex !== null) {
+          // Start drag
+          isDragging = true;
+          dragTileIndex = hoverIndex;
+        }
+      } else {
+        if (isDragging) {
+          // Drop - swap tiles
+          if (dragTileIndex !== null && hoverIndex !== null && dragTileIndex !== hoverIndex) {
+            [tiles[dragTileIndex], tiles[hoverIndex]] = [tiles[hoverIndex], tiles[dragTileIndex]];
+            if (SwapPuzzle.isSolved(tiles)) {
+              onSolved();
+            }
+          }
+          isDragging = false;
+          dragTileIndex = null;
+        }
+      }
+    }
+
+    // Render puzzle
+    ctx.save();
+    ctx.translate(boardSX, boardSY);
+
+    SwapPuzzle.render(
+      ctx,
+      puzzleImageCanvas,
+      tiles,
+      COLS, ROWS,
+      boardW, boardH,
+      isDragging && dragTileIndex !== null ? { index: dragTileIndex, x: relX, y: relY } : null,
+      hoverIndex
+    );
+
+    // Board border
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(0, 0, boardW, boardH);
+
+    ctx.restore();
+
+    // Draw cursor
+    if (results && results.landmarks && results.landmarks.length > 0) {
+      ctx.beginPath();
+      ctx.arc(cursorX, cursorY, 10, 0, Math.PI * 2);
+      if (isDragging) {
+        ctx.fillStyle = '#ccff00';
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = '#ccff00';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+
+    // Fist detection for reset
+    let fistDetected = false;
+    if (interactingHand && gameState === 'PLAYING') {
+      fistDetected = isFist(interactingHand);
+    }
+
+    if (fistDetected && gameState === 'PLAYING') {
+      if (!fistHoldStart) {
+        fistHoldStart = performance.now();
+      }
+      const elapsed = performance.now() - fistHoldStart;
+      const progress = Math.min(elapsed / RESET_DWELL_MS, 1);
+
+      // Draw reset progress
+      const cx = width / 2;
+      const cy = height / 2;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, 50, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, 50, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+      ctx.strokeStyle = '#ccff00';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('RESETTING', cx, cy - 5);
+      ctx.font = '10px monospace';
+      ctx.fillText('Hold Fist', cx, cy + 10);
+      ctx.restore();
+
+      if (elapsed > RESET_DWELL_MS) {
+        resetGame();
+      }
+    } else {
+      fistHoldStart = null;
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Button event handlers
+  // ---------------------------------------------------------------
+  btnShowLeaderboard.addEventListener('click', () => {
+    showLeaderboard();
+  });
+
+  btnReset.addEventListener('click', () => {
+    resetGame();
+  });
+
+  btnSubmitScore.addEventListener('click', () => {
+    submitScore();
+  });
+
+  playerNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitScore();
+  });
+
+  btnSkip.addEventListener('click', () => {
+    solvedOverlay.classList.add('hidden');
+    resetGame();
+  });
+
+  btnBackToGame.addEventListener('click', () => {
+    leaderboardOverlay.classList.add('hidden');
+    resetGame();
   });
 
   // ---------------------------------------------------------------
   // Bootstrap
   // ---------------------------------------------------------------
-  const sampleImage = generateSampleImage();
-  resizeCanvas();
-  initGame(sampleImage, 4);
+  async function init() {
+    updateUI();
+
+    // Start camera first, then detection
+    await startCamera();
+    if (!cameraReady) return;
+
+    await initDetection();
+
+    // Start render loop
+    requestAnimationFrame(renderLoop);
+  }
+
+  init();
 })();
