@@ -143,6 +143,10 @@
 \begin{abstract}
 \noindent
 This project implements a real-time hand gesture recognition system for controlling a browser-based jigsaw puzzle game via webcam. Using Google MediaPipe HandLandmarker to extract 21 three-dimensional hand landmarks, we classify gestures into five categories (open hand, fist, pinch, frame, none) using three methods: a rule-based heuristic, a Random Forest classifier, and an MLP neural network. Evaluation on the HaGRID v2 dataset (9,231 samples, 3,607 unique subjects) with Group 5-Fold Cross-Validation shows that the MLP achieves 98.41\% accuracy ($\pm$0.26\%), the Random Forest achieves 94.13\% ($\pm$1.25\%), while the heuristic classifier achieves only 0.99\% due to calibration mismatch with the data source. The MLP provides the best accuracy--latency tradeoff for game control applications.
+
+\vspace{0.5cm}
+\noindent
+\textbf{Source Code:} \href{https://github.com/dige04/CVsubject-USTH}{https://github.com/dige04/CVsubject-USTH}
 \end{abstract}
 
 \newpage
