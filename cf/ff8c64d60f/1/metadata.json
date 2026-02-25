@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "cfff8c64d60f",
+  "session_id": "4e1371fa-f421-4410-b1e6-73c4fd2809b5",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-25T14:16:12.042764Z",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "plans/research-vision-first-multimodal.md"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "fe49531be1c8",
+  "token_usage": {
+    "input_tokens": 3102758,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 223,
+    "api_call_count": 33
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-25T14:10:38.893376Z",
+    "agent_lines": 289,
+    "human_added": 95689,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 95978,
+    "agent_percentage": 0.3011106711954823
+  },
+  "transcript_path": ".claude/projects/-Users-hieudinh-Documents-my-projects-CVsubject/4e1371fa-f421-4410-b1e6-73c4fd2809b5.jsonl"
+}
