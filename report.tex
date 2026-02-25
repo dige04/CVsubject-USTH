@@ -219,6 +219,17 @@ MediaPipe Hands [2] is a real-time hand tracking solution developed by Google th
     \item \textbf{Tracking Optimization:} After initial detection, MediaPipe tracks the hand across subsequent frames using the previous landmark positions as a prior, avoiding the cost of re-running the palm detector on every frame. This enables real-time performance at 30+ FPS on mobile devices.
 \end{enumerate}
 
+\subsubsection{Image Preprocessing within MediaPipe}
+
+Before the CNN stages execute, MediaPipe applies several classical image preprocessing operations internally:
+
+\begin{itemize}
+    \item \textbf{Color Space Conversion:} The input frame is converted from the camera's native BGR format (OpenCV convention) to RGB, as the neural network was trained on RGB-ordered pixel data. This is a standard computer vision operation that ensures consistent channel ordering.
+    \item \textbf{Resolution Scaling:} The palm detection model operates on a fixed $256 \times 256$ input resolution. MediaPipe downscales the full video frame using bilinear interpolation while preserving the aspect ratio via letterboxing. This reduces the computational cost of the initial detection pass.
+    \item \textbf{Hand Region Cropping (ROI Extraction):} Once the palm detector localizes the bounding box, MediaPipe extracts and crops the hand Region of Interest (ROI) from the original resolution frame. This cropped region is then resized to $224 \times 224$ before being fed into the landmark regression network. By operating on a tightly cropped ROI rather than the full frame, the landmark model achieves higher spatial precision with lower computational overhead.
+    \item \textbf{Pixel Normalization:} All pixel values are normalized from the integer range $[0, 255]$ to floating-point $[0.0, 1.0]$ before entering the neural network, ensuring numerical stability during inference.
+\end{itemize}
+
 This two-stage architecture represents a \textbf{transfer learning} paradigm: MediaPipe's pretrained CNNs perform the heavy computer vision task of converting raw pixel data into a structured skeletal representation, while our downstream classifiers (RF, MLP) operate on this compact 63-dimensional output.
 
 \begin{figure}[H]
