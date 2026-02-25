@@ -1,0 +1,18 @@
+check demo game now
+
+---
+
+Can you rewrite more profession
+
+---
+
+Also please make the report more accademical
+
+---
+
+professor has topic list. And I see A Vision-First Multi-Modal Approach for Hand Gesture Recognition ; Is our project aligns with?
+
+---
+
+research what "vision-first multi-modal" typically   
+  means in recent CV literature? Make our project should be align
