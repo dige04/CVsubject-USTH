@@ -117,6 +117,29 @@
     }
 \end{frame}
 
+% --- SLIDE 5b: MEDIAPIPE CV INTERNALS ---
+\begin{frame}{Computer Vision Core: MediaPipe Two-Stage CNN}
+    \begin{itemize}
+        \item \textbf{Stage 1 --- Palm Detection:} A lightweight Single Shot Detector (SSD) CNN with a MobileNetV2 backbone scans the full frame to locate hand bounding boxes.
+        \item \textbf{Stage 2 --- Landmark Regression:} A specialized regression CNN crops the detected hand region and predicts all 21 $(x,y,z)$ joint coordinates simultaneously. This is \textit{not} classical feature matching (SIFT/ORB) --- it is a deep regression head.
+        \item \textbf{Tracking:} After initial detection, MediaPipe uses the previous landmarks as a prior, only re-running the palm detector when confidence drops. This enables 30+ FPS on mobile.
+    \end{itemize}
+    \vspace{0.3cm}
+    \centering
+    \textcolor{primaryblue}{
+        $\text{Full Frame} \xrightarrow[\text{SSD CNN}]{\text{Palm Detect}} \text{Crop} \xrightarrow[\text{Regression CNN}]{\text{Landmark}} \mathbf{L} \in \mathbb{R}^{21 \times 3}$
+    }
+\end{frame}
+
+% --- SLIDE 5c: LANDMARK SKELETON VISUALIZATION ---
+\begin{frame}{Skeletal Representation: One Sample per Gesture Class}
+    \begin{figure}
+        \centering
+        \includegraphics[width=\textwidth, height=5.5cm, keepaspectratio]{models/plots/landmark_skeleton_per_class.png}
+        \caption{21-point hand landmark graph per gesture. Black $\blacklozenge$ = wrist (translation origin), Gold $\blacksquare$ = MCP joint (scale reference).}
+    \end{figure}
+\end{frame}
+
 % --- SLIDE 6: DATASET ---
 \begin{frame}{Training Data: The HaGRID v2 Dataset Validation}
     \begin{columns}

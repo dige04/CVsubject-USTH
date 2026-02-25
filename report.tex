@@ -207,13 +207,32 @@ The system pipeline consists of two stages:
 \text{Video Frame} \xrightarrow{\text{MediaPipe}} \mathbf{L} \in \mathbb{R}^{21 \times 3} \xrightarrow{\text{Classifier}} y \in \{1, \ldots, 5\}
 \end{equation}
 
-where $\mathbf{L}$ represents the 21 hand landmarks with $(x, y, z)$ coordinates, and $y$ is the predicted gesture class. MediaPipe [2] provides real-time hand tracking using a two-stage detector: a palm detector followed by a hand landmark regression network that outputs 21 keypoints per hand.
+where $\mathbf{L}$ represents the 21 hand landmarks with $(x, y, z)$ coordinates, and $y$ is the predicted gesture class.
+
+\subsubsection{MediaPipe Hand Landmark Detection}
+
+MediaPipe Hands [2] is a real-time hand tracking solution developed by Google that implements a two-stage convolutional neural network (CNN) pipeline:
+
+\begin{enumerate}
+    \item \textbf{Stage 1 --- Palm Detection:} A lightweight Single Shot Detector (SSD) CNN scans the full video frame to locate the bounding box of the hand. This detector uses a modified MobileNetV2 backbone optimized for mobile inference. It runs on every frame during initial detection, and is re-triggered only when tracking confidence drops below a threshold.
+    \item \textbf{Stage 2 --- Landmark Regression:} A specialized regression CNN takes the cropped hand region from Stage 1 and predicts the $(x, y, z)$ coordinates of all 21 keypoints simultaneously. This is not a classical feature detector (e.g., SIFT, ORB); instead, it is a deep regression head trained on a large-scale annotated dataset of hand poses.
+    \item \textbf{Tracking Optimization:} After initial detection, MediaPipe tracks the hand across subsequent frames using the previous landmark positions as a prior, avoiding the cost of re-running the palm detector on every frame. This enables real-time performance at 30+ FPS on mobile devices.
+\end{enumerate}
+
+This two-stage architecture represents a \textbf{transfer learning} paradigm: MediaPipe's pretrained CNNs perform the heavy computer vision task of converting raw pixel data into a structured skeletal representation, while our downstream classifiers (RF, MLP) operate on this compact 63-dimensional output.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.6\textwidth]{mediapipe_landmarks.png}
-\caption{MediaPipe hand landmark topology showing the 21 3D keypoints extracted from each hand.}
+\caption{MediaPipe hand landmark topology showing the 21 3D keypoints extracted from each hand. The wrist (joint 0) serves as the translation origin, and the middle finger MCP (joint 9) defines the scale reference distance.}
 \label{fig:mediapipe-landmarks}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{models/plots/landmark_skeleton_per_class.png}
+\caption{Skeletal visualization of the 21-point hand landmark graph for each gesture class. Black diamonds mark the wrist (translation origin); gold squares mark the MCP joint (scale reference). The structural differences between gestures are clearly visible in the joint topology.}
+\label{fig:landmark-skeleton}
 \end{figure}
 
 \subsection{Related Work}
@@ -245,6 +264,13 @@ Key properties:
     \item \textbf{Crucial limitation:} The predefined annotations provide exclusively 2-Dimensional planar data ($z=0.0$). This effectively removes depth perception from the mathematical space, fundamentally penalizing models reliant on 3D geometric computations (such as traditional Heuristics).
     \item License: CC BY-NC-SA 4.0
 \end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{models/plots/class_distribution.png}
+\caption{Distribution of gesture samples across the five classes. The dataset is approximately balanced, with each class containing $\sim$2,000 samples except the ``none'' class (1,231 samples).}
+\label{fig:class-distribution}
+\end{figure}
 
 \subsection{Gesture Mapping}
 
@@ -312,6 +338,15 @@ All methods share a common preprocessing pipeline that normalizes raw MediaPipe 
     \end{equation}
     \item \textbf{Feature Array Construction}: Post-normalization, the wrist vector is effectively zeroed out and removed, yielding 20 structural landmarks $\times$ 3 coordinates. The final output passed to our algorithms is a tightly-packed \textbf{60-dimensional feature vector}.
 \end{enumerate}
+
+To validate the effectiveness of our normalization pipeline, we apply t-SNE dimensionality reduction to project the 60-dimensional feature vectors into a 2D scatter plot (Figure~\ref{fig:tsne}). The resulting clusters demonstrate that the five gesture classes are well-separated in the normalized feature space, confirming that the preprocessing successfully extracts discriminative structural information.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{models/plots/tsne_feature_space.png}
+\caption{t-SNE 2D projection of the normalized 60-dimensional landmark features, colored by gesture class. Well-separated clusters validate that the normalization pipeline preserves discriminative structural information across subjects.}
+\label{fig:tsne}
+\end{figure}
 
 %=============================================================================
 % FEATURE EXTRACTION AND MODEL TRAINING
