@@ -1,0 +1,41 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "cfff8c64d60f",
+  "session_id": "22530210-544d-4f08-9735-bc3bad997c89",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-25T14:10:32.074126Z",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "plans/20260225-1800-vision-first-multimodal/phase-01-data-pipeline.md",
+    "plans/20260225-1800-vision-first-multimodal/phase-02-yolo-training.md",
+    "plans/20260225-1800-vision-first-multimodal/phase-03-cnn-training.md",
+    "plans/20260225-1800-vision-first-multimodal/phase-04-fusion.md",
+    "plans/20260225-1800-vision-first-multimodal/phase-05-evaluation.md",
+    "plans/20260225-1800-vision-first-multimodal/phase-06-report-deployment.md",
+    "plans/20260225-1800-vision-first-multimodal/plan.md",
+    "plans/20260225-1800-vision-first-multimodal/research/researcher-01-yolo-fusion-cnn.md",
+    "plans/20260225-1800-vision-first-multimodal/research/researcher-02-evaluation-deployment.md",
+    "plans/20260225-1800-vision-first-multimodal/scout/scout-01-codebase.md"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "e731848a670c",
+  "transcript_identifier_at_start": "504c48e0-4cfb-470e-bd76-50ab803b0e6c",
+  "token_usage": {
+    "input_tokens": 1218099,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 57,
+    "api_call_count": 17
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-25T14:03:53.548302Z",
+    "agent_lines": 2291,
+    "human_added": 93687,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 95978,
+    "agent_percentage": 2.3870053553939443
+  },
+  "transcript_path": ".claude/projects/-Users-hieudinh-Documents-my-projects-CVsubject/22530210-544d-4f08-9735-bc3bad997c89.jsonl"
+}

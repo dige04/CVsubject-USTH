@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "cfff8c64d60f",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "plans/20260225-1800-vision-first-multimodal/phase-01-data-pipeline.md",
+    "plans/20260225-1800-vision-first-multimodal/phase-02-yolo-training.md",
+    "plans/20260225-1800-vision-first-multimodal/phase-03-cnn-training.md",
+    "plans/20260225-1800-vision-first-multimodal/phase-04-fusion.md",
+    "plans/20260225-1800-vision-first-multimodal/phase-05-evaluation.md",
+    "plans/20260225-1800-vision-first-multimodal/phase-06-report-deployment.md",
+    "plans/20260225-1800-vision-first-multimodal/plan.md",
+    "plans/20260225-1800-vision-first-multimodal/research/researcher-01-yolo-fusion-cnn.md",
+    "plans/20260225-1800-vision-first-multimodal/research/researcher-02-evaluation-deployment.md",
+    "plans/20260225-1800-vision-first-multimodal/scout/scout-01-codebase.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/cf/ff8c64d60f/0/metadata.json",
+      "transcript": "/cf/ff8c64d60f/0/full.jsonl",
+      "context": "/cf/ff8c64d60f/0/context.md",
+      "content_hash": "/cf/ff8c64d60f/0/content_hash.txt",
+      "prompt": "/cf/ff8c64d60f/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 1218099,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 57,
+    "api_call_count": 17
+  }
+}
