@@ -335,7 +335,7 @@ none & 1,000 & 231 & 1,231 \\
 \end{tabular}
 \end{table}
 
-The dataset contains 3,607 unique subjects (from HaGRID \texttt{user\_id}). Samples were capped at 1,000 per gesture per split for computational efficiency.
+The dataset contains 3,607 unique subjects (from HaGRID \texttt{user\_id}). Samples were capped at 1,000 per gesture per split for computational efficiency. The mild class imbalance in the ``none'' class (1,231 vs.\ 2,000 for other classes) was intentionally left unaddressed: we did not apply oversampling (SMOTE) or class weighting because (a) the imbalance ratio (1:1.6) is within acceptable bounds for tree-based and neural network classifiers, and (b) artificially inflating the ``none'' class would risk introducing synthetic noise into an already high-variance negative class. The MLP's achieved F1 of 0.953 on ``none'' confirms that the imbalance does not materially degrade performance.
 
 \subsection{Preprocessing Pipeline}
 
@@ -817,7 +817,7 @@ Several limitations of this work should be acknowledged:
     \item \textbf{Static gestures only.} All three methods classify individual frames independently. Dynamic gestures (e.g., swipe, wave) that require temporal context are not supported.
     \item \textbf{Single-hand input.} The ``frame'' gesture naturally involves two hands, but our pipeline processes one hand at a time. This explains its lower F1-score relative to other classes.
     \item \textbf{Domain gap.} Models trained on HaGRID studio-quality images may not generalize perfectly to unconstrained webcam environments with varying lighting, backgrounds, and camera quality.
-    \item \textbf{Class imbalance.} The ``none'' class has 1,231 samples vs.\ 2,000 for other classes, introducing a mild imbalance. While the impact appears small (MLP achieves 95.3\% F1 on ``none''), a larger ``none'' corpus could improve robustness.
+    \item \textbf{Class imbalance.} The ``none'' class has 1,231 samples vs.\ 2,000 for other classes, introducing a mild imbalance (ratio 1:1.6). We intentionally chose not to apply synthetic oversampling (see Section~\ref{sec:data}). The MLP achieves 95.3\% F1 on ``none,'' suggesting the impact is minimal, though a larger ``none'' corpus could further improve robustness.
 \end{enumerate}
 
 \subsection{Recommendations}

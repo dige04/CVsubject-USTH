@@ -101,37 +101,24 @@
     \end{table}
 \end{frame}
 
-% --- SLIDE 5: SYSTEM ARCHITECTURE ---
+% --- SLIDE 5: SYSTEM ARCHITECTURE + MEDIAPIPE INTERNALS ---
 \begin{frame}{End-to-End Pipeline: Webcam to Game Control}
     \begin{enumerate}
-        \item \textbf{Input Acquisition:} Video frame captured from webcam
-        \item \textbf{Landmark Extraction:} Google MediaPipe HandLandmarker produces 21 3D landmarks
-        \item \textbf{Normalization:} Position- and scale-invariant preprocessing
-        \item \textbf{Classification:} Gesture prediction via one of three evaluated methods
-        \item \textbf{Application:} Predicted gesture triggers corresponding game action
+        \item \textbf{Input:} Video frame captured from webcam (BGR $\rightarrow$ RGB conversion)
+        \item \textbf{Palm Detection:} SSD CNN (MobileNetV2) locates hand bounding box on $256 \times 256$ downscaled frame
+        \item \textbf{Landmark Regression:} Regression CNN predicts 21 $(x,y,z)$ joints from $224 \times 224$ cropped ROI
+        \item \textbf{Normalization:} Position- and scale-invariant preprocessing $\rightarrow$ 60D vector
+        \item \textbf{Classification:} Gesture prediction via Heuristic / RF / MLP
+        \item \textbf{Game Action:} Predicted gesture triggers puzzle interaction
     \end{enumerate}
-    \vspace{0.3cm}
+    \vspace{0.2cm}
     \centering
-    \textcolor{primaryblue}{
-        $\text{Video Frame} \xrightarrow{\text{MediaPipe}} \mathbf{L} \in \mathbb{R}^{21 \times 3} \xrightarrow{\text{Classifier}} y \in \{1,\dots,5\}$
+    \textcolor{primaryblue}{\small
+        $\text{Frame} \xrightarrow[\text{SSD}]{\text{Detect}} \text{ROI} \xrightarrow[\text{Regression}]{\text{Landmark}} \mathbf{L} \in \mathbb{R}^{21 \times 3} \xrightarrow{\text{Normalize}} \mathbf{x} \in \mathbb{R}^{60} \xrightarrow{\text{Classify}} y$
     }
 \end{frame}
 
-% --- SLIDE 5b: MEDIAPIPE CV INTERNALS ---
-\begin{frame}{Computer Vision Core: MediaPipe Two-Stage CNN}
-    \begin{itemize}
-        \item \textbf{Stage 1 --- Palm Detection:} A lightweight Single Shot Detector (SSD) CNN with a MobileNetV2 backbone scans the full frame to locate hand bounding boxes.
-        \item \textbf{Stage 2 --- Landmark Regression:} A specialized regression CNN crops the detected hand region and predicts all 21 $(x,y,z)$ joint coordinates simultaneously. This is \textit{not} classical feature matching (SIFT/ORB) --- it is a deep regression head.
-        \item \textbf{Tracking:} After initial detection, MediaPipe uses the previous landmarks as a prior, only re-running the palm detector when confidence drops. This enables 30+ FPS on mobile.
-    \end{itemize}
-    \vspace{0.3cm}
-    \centering
-    \textcolor{primaryblue}{
-        $\text{Full Frame} \xrightarrow[\text{SSD CNN}]{\text{Palm Detect}} \text{Crop} \xrightarrow[\text{Regression CNN}]{\text{Landmark}} \mathbf{L} \in \mathbb{R}^{21 \times 3}$
-    }
-\end{frame}
-
-% --- SLIDE 5c: LANDMARK SKELETON VISUALIZATION ---
+% --- SLIDE 5b: LANDMARK SKELETON VISUALIZATION ---
 \begin{frame}{Skeletal Representation: One Sample per Gesture Class}
     \begin{figure}
         \centering
@@ -402,25 +389,11 @@
         \item \textbf{Inference stack:} MediaPipe WASM (landmark detection) + ONNX Runtime Web (MLP classification)
         \item \textbf{Architecture:} Fully client-side -- no backend server, functions offline after initial load.
         \item \textbf{Temporal smoothing:} 3-frame debounce buffer prevents gesture jitter.
+        \item \textbf{Testing:} 28 automated tests covering preprocessing, feature extraction, and classifier pipelines.
     \end{itemize}
     \vspace{0.3cm}
     \centering
     \textit{[Live Demonstration in Class]}
-\end{frame}
-
-% --- SLIDE 18: SOFTWARE ENGINEERING ---
-\begin{frame}{Implementation Quality: modular Architecture and Testing}
-    \begin{itemize}
-        \item \textbf{Test coverage:} 28 automated tests spanning preprocessing, feature extraction, classifiers, and data conversion.
-        \item \textbf{Modular design:} Single-responsibility modules with clean interfaces.
-        \item \textbf{Reproducibility:} Single command executes the full pipeline from data extraction through evaluation.
-    \end{itemize}
-    \begin{block}{Project Directory}
-        \small\texttt{CVsubject/ml/} \\
-        \texttt{├── preprocessing.py | features.py | train.py | evaluate.py} \\
-        \texttt{├── heuristic.py | random\_forest.py | mlp.py} \\
-        \texttt{└── tests/test\_core.py \# 28 automated tests}
-    \end{block}
 \end{frame}
 
 % --- SLIDE 19: LIMITATIONS & FUTURE ---
@@ -459,6 +432,21 @@
             ``The gap between classical ML and deep learning is incremental (4 points), but the decision must be governed by practical hardware latency constraints.''
         \end{quote}
     \end{center}
+\end{frame}
+
+% --- SLIDE 21: THANK YOU ---
+\begin{frame}
+    \centering
+    \vspace{1.5cm}
+    {\Huge\textbf{Thank You!}}
+    \vspace{1cm}
+    
+    {\Large Questions?}
+    \vspace{1.5cm}
+    
+    {\small
+        \textbf{Source Code:} \href{https://github.com/dige04/CVsubject-USTH}{github.com/dige04/CVsubject-USTH}
+    }
 \end{frame}
 
 \end{document}
