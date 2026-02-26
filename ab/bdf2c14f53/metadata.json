@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "abbdf2c14f53",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "game/cnn_model.onnx",
+    "game/gesture.js",
+    "game/index.html",
+    "game/main.js",
+    "game/style.css"
+  ],
+  "sessions": [
+    {
+      "metadata": "/ab/bdf2c14f53/0/metadata.json",
+      "transcript": "/ab/bdf2c14f53/0/full.jsonl",
+      "context": "/ab/bdf2c14f53/0/context.md",
+      "content_hash": "/ab/bdf2c14f53/0/content_hash.txt",
+      "prompt": "/ab/bdf2c14f53/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 4712286,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 522,
+    "api_call_count": 44
+  }
+}
