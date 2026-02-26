@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "f26c01a64be6",
+  "session_id": "fdb900cd-eae6-4ebc-bbf5-4b6fde401364",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-26T19:56:49.331845Z",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "game/game.js",
+    "game/index.html",
+    "game/main.js",
+    "game/style.css"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "627fda77a978",
+  "transcript_identifier_at_start": "8a89c735-b404-4e94-b0b2-972642654def",
+  "token_usage": {
+    "input_tokens": 17514746,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 1479,
+    "api_call_count": 159
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-26T19:49:44.232941Z",
+    "agent_lines": 0,
+    "human_added": 49,
+    "human_modified": 435,
+    "human_removed": 0,
+    "total_committed": 49,
+    "agent_percentage": 0
+  },
+  "transcript_path": ".claude/projects/-Users-hieudinh-Documents-my-projects-CVsubject/fdb900cd-eae6-4ebc-bbf5-4b6fde401364.jsonl"
+}
