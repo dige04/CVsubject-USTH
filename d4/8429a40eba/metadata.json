@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "d48429a40eba",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "game/gesture.js",
+    "ml/cnn.py",
+    "ml/fusion.py",
+    "ml/requirements.txt",
+    "ml/scripts/__init__.py",
+    "ml/scripts/build_fusion_dataset.py",
+    "ml/scripts/convert_to_yolo.py",
+    "ml/scripts/download_hagrid.py",
+    "ml/scripts/extract_crops.py",
+    "ml/scripts/generate_splits.py",
+    "ml/scripts/train_cnn.py",
+    "ml/scripts/train_yolo.py",
+    "ml/scripts/unified_evaluation.py",
+    "ml/scripts/yolo_group_kfold.py",
+    "notebooks/full_pipeline.ipynb"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d4/8429a40eba/0/metadata.json",
+      "transcript": "/d4/8429a40eba/0/full.jsonl",
+      "context": "/d4/8429a40eba/0/context.md",
+      "content_hash": "/d4/8429a40eba/0/content_hash.txt",
+      "prompt": "/d4/8429a40eba/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 4712286,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 522,
+    "api_call_count": 44
+  }
+}
