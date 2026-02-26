@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "0e4084fbfd74",
+  "session_id": "785a4e6b-c0b5-4fa0-8d9d-8213fc7f02f5",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-26T05:04:35.129321Z",
+  "branch": "master",
+  "checkpoints_count": 4,
+  "files_touched": [
+    "ml/scripts/run_ablation.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "6e6f76a22446",
+  "transcript_identifier_at_start": "dc002269-840a-4e85-9f6b-20a81aadb765",
+  "token_usage": {
+    "input_tokens": 13435276,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 1268,
+    "api_call_count": 114
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-26T05:04:33.965198Z",
+    "agent_lines": 406,
+    "human_added": 0,
+    "human_modified": 37,
+    "human_removed": 69,
+    "total_committed": 443,
+    "agent_percentage": 91.64785553047405
+  },
+  "transcript_path": ".claude/projects/-Users-hieudinh-Documents-my-projects-CVsubject/785a4e6b-c0b5-4fa0-8d9d-8213fc7f02f5.jsonl"
+}
