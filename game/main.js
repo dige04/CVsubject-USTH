@@ -21,12 +21,12 @@
 
   // Hand skeleton connection pairs
   const HAND_CONNECTIONS = [
-    [0, 1], [1, 2], [2, 3], [3, 4],
-    [0, 5], [5, 6], [6, 7], [7, 8],
-    [0, 9], [9, 10], [10, 11], [11, 12],
-    [0, 13], [13, 14], [14, 15], [15, 16],
-    [0, 17], [17, 18], [18, 19], [19, 20],
-    [5, 9], [9, 13], [13, 17],
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [0,9],[9,10],[10,11],[11,12],
+    [0,13],[13,14],[14,15],[15,16],
+    [0,17],[17,18],[18,19],[19,20],
+    [5,9],[9,13],[13,17],
   ];
 
   // Leaderboard keys
@@ -47,14 +47,11 @@
 
   // Interaction
   let smoothCursor = { x: 0, y: 0 };
-  let prevCursor = { x: 0, y: 0 };
   let isDragging = false;
   let dragTileIndex = null;
   let lastPinchTime = 0;
   let lastFrameCoords = null;
   let fistHoldStart = null;
-  let lastHandSeenTime = 0;       // Grace period timestamp
-  const HAND_GRACE_MS = 200;      // Hold gesture for 200ms after hand loss
 
   // Gesture controller
   let gestureCtrl = null;
@@ -184,14 +181,14 @@
     switch (gameState) {
       case 'SCANNING':
         html = '<p class="instr-phase">PHASE 1: CAPTURE</p>' +
-          '<p>1. Form a frame with two hands</p>' +
-          '<p>2. Pinch both hands to SNAP</p>';
+               '<p>1. Form a frame with two hands</p>' +
+               '<p>2. Pinch both hands to SNAP</p>';
         break;
       case 'PLAYING':
         html = '<p class="instr-phase">PHASE 2: SOLVE</p>' +
-          '<p>1. Pinch to Pick Up</p>' +
-          '<p>2. Drag & Drop to Swap</p>' +
-          '<p style="color:var(--accent);margin-top:6px">Hold Fist to Reset</p>';
+               '<p>1. Pinch to Pick Up</p>' +
+               '<p>2. Drag & Drop to Swap</p>' +
+               '<p style="color:var(--accent);margin-top:6px">Hold Fist to Reset</p>';
         break;
       case 'SOLVED':
         html = '<p class="instr-phase">PUZZLE SOLVED!</p>';
@@ -273,13 +270,6 @@
     timeElapsed = 0;
     startTime = null;
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-    // Reset tracking state
-    trackingState = 'IDLE';
-    grabOrigin = null;
-    gestureBuffer = [];
-    currentGesture = 'none';
-    currentConfidence = 0;
-    mlpPending = false;
     solvedOverlay.classList.add('hidden');
     leaderboardOverlay.classList.add('hidden');
     updateUI();
@@ -568,25 +558,8 @@
   }
 
   // ---------------------------------------------------------------
-  // PLAYING handler — MLP-driven gesture tracking state machine
+  // PLAYING handler
   // ---------------------------------------------------------------
-
-  // Tracking state
-  let trackingState = 'IDLE'; // IDLE | GRABBING | FIST_HOLD
-  let grabOrigin = null;      // {x, y} when pinch started
-  let gestureBuffer = [];     // Last N gesture predictions for debounce
-  const GESTURE_DEBOUNCE = 4; // Frames of consistent gesture to trigger
-  let currentGesture = 'none';
-  let currentConfidence = 0;
-  let mlpPending = false;     // Prevent overlapping async calls
-
-  function getStableGesture() {
-    if (gestureBuffer.length < GESTURE_DEBOUNCE) return null;
-    const last = gestureBuffer.slice(-GESTURE_DEBOUNCE);
-    const allSame = last.every(g => g === last[0]);
-    return allSame ? last[0] : null;
-  }
-
   function handlePlaying(results, width, height) {
     const c = boardCoords;
     const boardSX = (1 - c.maxX) * width;
@@ -595,6 +568,7 @@
     const boardH = (c.maxY * height) - boardSY;
 
     let hoverIndex = null;
+    let pinching = false;
     let interactingHand = null;
 
     // Process hand input
@@ -605,50 +579,25 @@
       const indexTip = hand[8];
       const thumbTip = hand[4];
 
-      // Raw pointer: midpoint of thumb + index
+      // Raw pointer position (mirrored)
       const rawX = (1 - (indexTip.x + thumbTip.x) / 2) * width;
       const rawY = ((indexTip.y + thumbTip.y) / 2) * height;
 
-      // Adaptive cursor smoothing — fast for big moves, smooth for small
+      // Pinch state
+      const dist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+      pinching = dist < PINCH_THRESHOLD;
+
+      // Smooth cursor (lerp based on distance)
       const distMove = Math.hypot(rawX - smoothCursor.x, rawY - smoothCursor.y);
-      const velocity = Math.hypot(rawX - prevCursor.x, rawY - prevCursor.y);
-      prevCursor = { x: rawX, y: rawY };
-      // High velocity → alpha near 1 (responsive), low → alpha ~0.3 (smooth)
-      const alpha = Math.min(1.0, 0.25 + Math.min(velocity / 80, 0.75));
+      const alpha = distMove > 100 ? 1.0 : 0.4;
       smoothCursor.x = smoothCursor.x * (1 - alpha) + rawX * alpha;
       smoothCursor.y = smoothCursor.y * (1 - alpha) + rawY * alpha;
-
-      lastHandSeenTime = performance.now();
-
-      // Run MLP classification (async, non-blocking)
-      if (!mlpPending && gestureCtrl && gestureCtrl.session) {
-        mlpPending = true;
-        gestureCtrl.classifyLandmarksAsync(hand).then(result => {
-          currentGesture = result.gesture;
-          currentConfidence = result.confidence;
-          gestureBuffer.push(result.gesture);
-          if (gestureBuffer.length > 10) gestureBuffer.shift();
-          mlpPending = false;
-        }).catch(() => { mlpPending = false; });
-      }
-    } else {
-      // No hand — grace period before resetting
-      const timeSinceLast = performance.now() - lastHandSeenTime;
-      if (timeSinceLast > HAND_GRACE_MS) {
-        gestureBuffer = [];
-        currentGesture = 'none';
-        if (trackingState === 'GRABBING') {
-          isDragging = false;
-          dragTileIndex = null;
-          trackingState = 'IDLE';
-        }
-      }
     }
 
     const cursorX = smoothCursor.x;
     const cursorY = smoothCursor.y;
 
-    // Tile under cursor
+    // Calculate tile under cursor
     const relX = cursorX - boardSX;
     const relY = cursorY - boardSY;
     if (relX >= 0 && relX <= boardW && relY >= 0 && relY <= boardH) {
@@ -659,83 +608,26 @@
       }
     }
 
-    // State machine (only during PLAYING)
+    // Drag & drop logic (only during PLAYING)
     if (gameState === 'PLAYING') {
-      const stable = getStableGesture();
-
-      switch (trackingState) {
-        case 'IDLE':
-          if (stable === 'pinch' && hoverIndex !== null) {
-            // Transition: IDLE → GRABBING
-            trackingState = 'GRABBING';
-            isDragging = true;
-            dragTileIndex = hoverIndex;
-            grabOrigin = { x: cursorX, y: cursorY };
-          } else if (stable === 'fist') {
-            trackingState = 'FIST_HOLD';
-            fistHoldStart = performance.now();
-          }
-          break;
-
-        case 'GRABBING':
-          if (stable === 'open_hand' || stable === 'none') {
-            // Transition: GRABBING → IDLE (drop)
-            isDragging = false;
-            dragTileIndex = null;
-            grabOrigin = null;
-            trackingState = 'IDLE';
-          } else if (dragTileIndex !== null && grabOrigin) {
-            // Implement Huda et al. Mathematical Model (Grid-based Swipe)
-            // Determine thresholds based on tile size
-            const tileW = boardW / COLS;
-            const tileH = boardH / ROWS;
-            const movX = tileW * 0.6; // Movement threshold X
-            const movY = tileH * 0.6; // Movement threshold Y
-            const tol = Math.min(tileW, tileH) * 0.3; // Orthogonal tolerance zone
-
-            const dx = cursorX - grabOrigin.x;
-            const dy = cursorY - grabOrigin.y;
-
-            let swapTargetIndex = null;
-            const cCol = dragTileIndex % COLS;
-            const cRow = Math.floor(dragTileIndex / COLS);
-
-            // Drive Right
-            if (dx > movX && Math.abs(dy) < tol) {
-              if (cCol < COLS - 1) swapTargetIndex = dragTileIndex + 1;
-            }
-            // Drive Left
-            else if (dx < -movX && Math.abs(dy) < tol) {
-              if (cCol > 0) swapTargetIndex = dragTileIndex - 1;
-            }
-            // Drive Forward (Up in screen coords = -y)
-            else if (dy < -movY && Math.abs(dx) < tol) {
-              if (cRow > 0) swapTargetIndex = dragTileIndex - COLS;
-            }
-            // Drive Backward (Down in screen coords = +y)
-            else if (dy > movY && Math.abs(dx) < tol) {
-              if (cRow < ROWS - 1) swapTargetIndex = dragTileIndex + COLS;
-            }
-
-            // Perform discrete swap if threshold met
-            if (swapTargetIndex !== null) {
-              [tiles[dragTileIndex], tiles[swapTargetIndex]] = [tiles[swapTargetIndex], tiles[dragTileIndex]];
-              dragTileIndex = swapTargetIndex; // Update selected index
-              grabOrigin = { x: cursorX, y: cursorY }; // Update origin for continuous swiping
-
-              if (SwapPuzzle.isSolved(tiles)) {
-                onSolved();
-              }
+      if (pinching) {
+        if (!isDragging && hoverIndex !== null) {
+          // Start drag
+          isDragging = true;
+          dragTileIndex = hoverIndex;
+        }
+      } else {
+        if (isDragging) {
+          // Drop - swap tiles
+          if (dragTileIndex !== null && hoverIndex !== null && dragTileIndex !== hoverIndex) {
+            [tiles[dragTileIndex], tiles[hoverIndex]] = [tiles[hoverIndex], tiles[dragTileIndex]];
+            if (SwapPuzzle.isSolved(tiles)) {
+              onSolved();
             }
           }
-          break;
-
-        case 'FIST_HOLD':
-          if (stable !== 'fist') {
-            fistHoldStart = null;
-            trackingState = 'IDLE';
-          }
-          break;
+          isDragging = false;
+          dragTileIndex = null;
+        }
       }
     }
 
@@ -772,46 +664,22 @@
         ctx.lineWidth = 2;
         ctx.stroke();
       }
+    }
 
-      // Draw drag line from grab origin
-      if (grabOrigin && isDragging) {
-        ctx.beginPath();
-        ctx.moveTo(grabOrigin.x, grabOrigin.y);
-        ctx.lineTo(cursorX, cursorY);
-        ctx.strokeStyle = 'rgba(204, 255, 0, 0.5)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.stroke();
-        ctx.setLineDash([]);
+    // Fist detection for reset
+    let fistDetected = false;
+    if (interactingHand && gameState === 'PLAYING') {
+      fistDetected = isFist(interactingHand);
+    }
 
-        // Grab origin marker
-        ctx.beginPath();
-        ctx.arc(grabOrigin.x, grabOrigin.y, 6, 0, Math.PI * 2);
-        ctx.strokeStyle = '#ccff00';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+    if (fistDetected && gameState === 'PLAYING') {
+      if (!fistHoldStart) {
+        fistHoldStart = performance.now();
       }
-    }
-
-    // Gesture HUD
-    if (currentGesture !== 'none') {
-      ctx.save();
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-      ctx.fillRect(10, height - 50, 200, 40);
-      ctx.fillStyle = '#ccff00';
-      ctx.font = 'bold 16px monospace';
-      ctx.fillText(`${currentGesture} (${(currentConfidence * 100).toFixed(0)}%)`, 20, height - 25);
-      ctx.fillStyle = '#888';
-      ctx.font = '11px monospace';
-      ctx.fillText(`state: ${trackingState}`, 20, height - 12);
-      ctx.restore();
-    }
-
-    // Fist hold reset (preserved)
-    if (trackingState === 'FIST_HOLD' && fistHoldStart && gameState === 'PLAYING') {
       const elapsed = performance.now() - fistHoldStart;
       const progress = Math.min(elapsed / RESET_DWELL_MS, 1);
 
+      // Draw reset progress
       const cx = width / 2;
       const cy = height / 2;
 
@@ -839,8 +707,9 @@
 
       if (elapsed > RESET_DWELL_MS) {
         resetGame();
-        trackingState = 'IDLE';
       }
+    } else {
+      fistHoldStart = null;
     }
   }
 

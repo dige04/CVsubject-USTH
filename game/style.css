@@ -76,6 +76,19 @@ html, body {
   text-shadow: 0 2px 10px rgba(204, 255, 0, 0.3);
 }
 
+.course-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  margin-bottom: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--bg-base);
+  background: var(--accent);
+  border-radius: var(--radius-full);
+}
+
 .subtitle {
   font-size: 12px;
   color: var(--text-muted);
@@ -743,6 +756,12 @@ html, body {
 
   .subtitle {
     font-size: 10px;
+  }
+
+  .course-badge {
+    font-size: 8px;
+    padding: 2px 8px;
+    margin-bottom: 4px;
   }
 
   .title-bar {

@@ -1,10 +1,6 @@
 /**
  * GestureController - MediaPipe HandLandmarker integration with
- * ONNX-based MLP gesture classification and optional CNN fusion.
- *
- * When the CNN model is available, late fusion combines MLP (skeleton)
- * and CNN (appearance) predictions via weighted average. Falls back
- * to MLP-only inference when CNN fails to load.
+ * ONNX-based MLP gesture classification.
  *
  * Gestures detected (via trained MLP model):
  *   "pinch"     - Thumb tip close to index tip
@@ -29,19 +25,10 @@ class GestureController {
     this.camera = null;
     this.running = false;
 
-    // ONNX inference sessions
-    this.session = null;       // MLP session
-    this.cnnSession = null;    // CNN session (optional)
-    this.fusionEnabled = false; // true when CNN loaded successfully
-    this.fusionAlpha = 0.7;    // MLP weight for fusion (MLP dominant: 98% vs ~90%)
+    // ONNX inference session
+    this.session = null;
     this._isInferring = false;
     this._lastPrediction = { gesture: 'none', confidence: 0 };
-
-    // Offscreen canvas for hand crop extraction (CNN input)
-    this._cropCanvas = document.createElement('canvas');
-    this._cropCanvas.width = 224;
-    this._cropCanvas.height = 224;
-    this._cropCtx = this._cropCanvas.getContext('2d');
 
     // Current state
     this._gesture = 'none';
@@ -160,30 +147,16 @@ class GestureController {
     this._processLoop();
   }
 
-  /** Initialize ONNX Runtime inference sessions (MLP + optional CNN). */
+  /** Initialize ONNX Runtime inference session. */
   async _initONNXSession() {
-    // MLP session (primary, required)
     try {
       this.session = await ort.InferenceSession.create('./mlp_model.onnx', {
         executionProviders: ['wasm'],
       });
-      console.log('MLP ONNX session initialized.');
+      console.log('ONNX session initialized.');
     } catch (e) {
-      console.warn('MLP ONNX session failed to load, falling back to heuristic:', e);
+      console.warn('ONNX session failed to load, falling back to heuristic:', e);
       this.session = null;
-    }
-
-    // CNN session (optional, for fusion)
-    try {
-      this.cnnSession = await ort.InferenceSession.create('./cnn_model.onnx', {
-        executionProviders: ['webgpu', 'wasm'],
-      });
-      this.fusionEnabled = true;
-      console.log('CNN model loaded; fusion mode active.');
-    } catch (e) {
-      console.warn('CNN model failed to load; MLP-only mode:', e.message);
-      this.cnnSession = null;
-      this.fusionEnabled = false;
     }
   }
 
@@ -282,7 +255,6 @@ class GestureController {
 
   /**
    * Run async ONNX inference on landmarks.
-   * Uses fused MLP+CNN prediction when fusionEnabled, otherwise MLP-only.
    * @param {Array} landmarks - 21 MediaPipe hand landmarks
    */
   async _runInference(landmarks) {
@@ -290,20 +262,9 @@ class GestureController {
       const inputData = this._preprocessLandmarks(landmarks);
       if (!inputData) return;
 
-      // MLP inference
-      const mlpTensor = new ort.Tensor('float32', inputData, [1, 60]);
-      const mlpResults = await this.session.run({ input: mlpTensor });
-      const mlpOutput = mlpResults.output.data;
-
-      let probabilities;
-
-      if (this.fusionEnabled && this.cnnSession) {
-        // Fused inference: MLP + CNN
-        probabilities = await this._fusedPredict(mlpOutput, landmarks);
-      } else {
-        // MLP-only: output is already softmaxed probabilities
-        probabilities = mlpOutput;
-      }
+      const tensor = new ort.Tensor('float32', inputData, [1, 60]);
+      const results = await this.session.run({ input: tensor });
+      const probabilities = results.output.data;
 
       // Find class with highest probability
       let maxProb = -1;
@@ -322,110 +283,6 @@ class GestureController {
     } catch (error) {
       console.error('Inference error:', error);
     }
-  }
-
-  /**
-   * Run CNN inference and fuse with MLP output via weighted average.
-   * @param {Float32Array} mlpOutput - Raw MLP output (probabilities or logits)
-   * @param {Array} landmarks - 21 MediaPipe hand landmarks for crop extraction
-   * @returns {Float32Array} Fused probability array
-   */
-  async _fusedPredict(mlpOutput, landmarks) {
-    const mlpProbs = this._softmax(mlpOutput);
-
-    // Extract hand crop from video frame and run CNN
-    const cropTensor = this._extractHandCrop(
-      landmarks, this.video.videoWidth, this.video.videoHeight
-    );
-    const cnnResults = await this.cnnSession.run({ image: cropTensor });
-    const cnnProbs = this._softmax(cnnResults.logits.data);
-
-    // Late fusion: weighted average
-    const fused = new Float32Array(mlpProbs.length);
-    for (let i = 0; i < mlpProbs.length; i++) {
-      fused[i] = this.fusionAlpha * mlpProbs[i] +
-                 (1 - this.fusionAlpha) * cnnProbs[i];
-    }
-    return fused;
-  }
-
-  /**
-   * Extract a hand crop from the video frame, resize to 224x224,
-   * and convert to a CHW Float32Array with ImageNet normalization.
-   *
-   * @param {Array} landmarks - 21 MediaPipe hand landmarks (normalized 0-1)
-   * @param {number} videoWidth - Video element width in pixels
-   * @param {number} videoHeight - Video element height in pixels
-   * @returns {ort.Tensor} Float32 tensor of shape [1, 3, 224, 224]
-   */
-  _extractHandCrop(landmarks, videoWidth, videoHeight) {
-    // Compute bounding box from all 21 landmarks
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
-    for (let i = 0; i < landmarks.length; i++) {
-      const px = landmarks[i].x * videoWidth;
-      const py = landmarks[i].y * videoHeight;
-      if (px < minX) minX = px;
-      if (px > maxX) maxX = px;
-      if (py < minY) minY = py;
-      if (py > maxY) maxY = py;
-    }
-
-    // Add 10% padding
-    const padFrac = 0.1;
-    const bboxW = maxX - minX;
-    const bboxH = maxY - minY;
-    const x1 = Math.max(0, minX - padFrac * bboxW);
-    const y1 = Math.max(0, minY - padFrac * bboxH);
-    const x2 = Math.min(videoWidth, maxX + padFrac * bboxW);
-    const y2 = Math.min(videoHeight, maxY + padFrac * bboxH);
-
-    const cropW = x2 - x1;
-    const cropH = y2 - y1;
-
-    // Draw cropped region to offscreen 224x224 canvas
-    this._cropCtx.clearRect(0, 0, 224, 224);
-    if (cropW > 0 && cropH > 0) {
-      this._cropCtx.drawImage(this.video, x1, y1, cropW, cropH, 0, 0, 224, 224);
-    }
-    const imageData = this._cropCtx.getImageData(0, 0, 224, 224);
-    const pixels = imageData.data; // RGBA Uint8ClampedArray
-
-    // Convert RGBA HWC to CHW Float32 with ImageNet normalization
-    // mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]
-    const mean = [0.485, 0.456, 0.406];
-    const std = [0.229, 0.224, 0.225];
-    const numPixels = 224 * 224;
-    const float32Data = new Float32Array(3 * numPixels);
-
-    for (let i = 0; i < numPixels; i++) {
-      const rgbaIdx = i * 4; // skip alpha (index 3)
-      for (let c = 0; c < 3; c++) {
-        float32Data[c * numPixels + i] =
-          (pixels[rgbaIdx + c] / 255.0 - mean[c]) / std[c];
-      }
-    }
-
-    return new ort.Tensor('float32', float32Data, [1, 3, 224, 224]);
-  }
-
-  /**
-   * Numerically stable softmax over a Float32Array or typed array.
-   * @param {Float32Array|Array} logits - Raw model output
-   * @returns {Float32Array} Probability distribution summing to 1
-   */
-  _softmax(logits) {
-    const maxVal = Math.max(...logits);
-    const exps = new Float32Array(logits.length);
-    let sumExp = 0;
-    for (let i = 0; i < logits.length; i++) {
-      exps[i] = Math.exp(logits[i] - maxVal);
-      sumExp += exps[i];
-    }
-    for (let i = 0; i < exps.length; i++) {
-      exps[i] /= sumExp;
-    }
-    return exps;
   }
 
   /**
@@ -643,11 +500,5 @@ class GestureController {
       this.handLandmarker.close();
       this.handLandmarker = null;
     }
-    // Release ONNX sessions
-    this.session = null;
-    this.cnnSession = null;
-    this.fusionEnabled = false;
-    this._cropCanvas = null;
-    this._cropCtx = null;
   }
 }
