@@ -135,24 +135,29 @@
 % SLIDE 3: DATASET (1.5 min)
 % ======================================================================
 \begin{frame}{Dataset: HaGRID v2 --- 5 Gesture Classes}
+\vspace{-0.3em}
+\centering
+\includegraphics[width=0.85\textwidth,height=3cm,keepaspectratio]{hagrid_samples.png}
+
+\vspace{0.3em}
 \begin{columns}[c]
-\begin{column}{0.55\textwidth}
+\begin{column}{0.32\textwidth}
     \centering
-    \includegraphics[width=\textwidth,height=5cm,keepaspectratio]{landmark_skeleton_per_class.png}
-    {\scriptsize MediaPipe skeleton landmarks per gesture class}
+    \includegraphics[width=\textwidth,height=3.2cm,keepaspectratio]{mediapipe_landmarks.png}
+    {\tiny 21 keypoints $\to$ 60D vector}
 \end{column}
-\begin{column}{0.42\textwidth}
-    \textbf{HaGRID v2 Subset:}
-    \begin{itemize}
+\begin{column}{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth,height=3.2cm,keepaspectratio]{class_distribution.png}
+    {\tiny 3:1 imbalance (Frame/None)}
+\end{column}
+\begin{column}{0.32\textwidth}
+    \textbf{\small HaGRID v2 Subset:}
+    \begin{itemize}\setlength\itemsep{2pt}
         \item \textbf{23,850} samples
         \item \textbf{13,250} unique subjects
-        \item 5 classes: Pinch, Fist,\\Open Hand, Frame, None
+        \item Person-aware 5-fold CV
     \end{itemize}
-
-    \vspace{0.5em}
-    \centering
-    \includegraphics[width=0.9\textwidth,height=3.5cm,keepaspectratio]{class_distribution.png}
-    {\scriptsize 3:1 imbalance (Frame/None vs others)}
 \end{column}
 \end{columns}
 \end{frame}
@@ -431,30 +436,7 @@
     \begin{columns}[c]
     \begin{column}{0.42\textwidth}
         \centering
-        \begin{tikzpicture}[scale=0.9,
-            tol/.style={draw=accent, thick, dashed, fill=accent!8},
-            ax/.style={-latex, thick, gray!50},
-            mv/.style={-latex, very thick, primary},
-        ]
-            \draw[gray!15, step=0.5] (-1.8,-1.8) grid (1.8,1.8);
-
-            \draw[tol] (-0.8, -1.5) rectangle (0.8, 1.5);
-            \node[accent, font=\tiny] at (0.5, 1.3) {$tol$};
-
-            \draw[ax] (-1.8, 0) -- (1.8, 0) node[right, font=\scriptsize] {$x$};
-            \draw[ax] (0, -1.8) -- (0, 1.8) node[above, font=\scriptsize] {$y$};
-
-            \fill[primary!80] (0,0) circle (2.5pt);
-            \node[font=\tiny, below left] at (0,0) {origin};
-
-            \draw[mv] (0,0) -- (1.3, 0);
-            \node[primary, font=\tiny, below] at (0.65, 0) {$mov_x$};
-
-            \fill[success] (1.5, 0.2) circle (2.5pt);
-            \node[font=\tiny, above right, success] at (1.5, 0.2) {swap!};
-
-            \node[primary, font=\scriptsize\bfseries] at (1.5, -0.8) {$\to$ Right};
-        \end{tikzpicture}
+        \includegraphics[width=\textwidth,height=5cm,keepaspectratio]{interaction_model.png}
 
         \vspace{0.3em}
         {\scriptsize Huda: wheelchair steering\\Ours: puzzle tile swap}

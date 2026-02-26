@@ -193,7 +193,14 @@ none       & \num{7950} & \num{2650} \\
 \end{tabular}
 \end{table}
 
-\Cref{fig:classdist} visualizes the class distribution.
+\Cref{fig:gesture_samples} illustrates representative examples from each class, and \Cref{fig:classdist} visualizes the class distribution.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.75\textwidth]{hagrid_samples.png}
+\caption{Representative gesture samples from the HaGRID v2 dataset showing the five target classes.}
+\label{fig:gesture_samples}
+\end{figure}
 
 \begin{figure}[htbp]
 \centering
@@ -231,9 +238,18 @@ From each image, we extract two parallel representations corresponding to our tw
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.55\textwidth]{tsne_feature_space.png}
+\begin{minipage}[t]{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{mediapipe_landmarks.png}
+\caption{MediaPipe hand landmark model: 21 keypoints per hand connected in a skeletal topology. Landmark 0 (wrist) serves as the translation origin.}
+\label{fig:mediapipe}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\textwidth}
+\centering
+\includegraphics[width=\textwidth]{tsne_feature_space.png}
 \caption{t-SNE projection of the 60D normalized landmark feature space. The five gesture classes form well-separated clusters, foreshadowing the ceiling effect observed in classification.}
 \label{fig:tsne}
+\end{minipage}
 \end{figure}
 
 \paragraph{Hand crop images (Modality~2).} For training, we use \textbf{YOLO ground-truth bounding box annotations} provided by the HaGRID dataset to extract hand regions. For deployment, we use \textbf{MediaPipe detection bounding boxes} instead (since ground-truth annotations are unavailable at inference time). Cropped regions are resized to $224 \times 224$ RGB and normalized using ImageNet statistics ($\mu = [0.485, 0.456, 0.406]$, $\sigma = [0.229, 0.224, 0.225]$).
