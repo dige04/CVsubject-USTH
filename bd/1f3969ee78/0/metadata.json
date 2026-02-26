@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "bd1f3969ee78",
+  "session_id": "2c19eac5-a431-4d94-b080-f97486ff792b",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-26T10:02:49.252505Z",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "outputs/presentation.tex",
+    "outputs/professor_critique.md",
+    "outputs/report.pdf",
+    "outputs/report.tex",
+    "outputs/presentation.pdf"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "e6e9ac4b1003",
+  "transcript_identifier_at_start": "d048ce35-3d26-47e6-b205-a2cf60bf3ed9",
+  "token_usage": {
+    "input_tokens": 4712286,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 522,
+    "api_call_count": 44
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-26T10:02:47.829593Z",
+    "agent_lines": 906,
+    "human_added": 3,
+    "human_modified": 2,
+    "human_removed": 0,
+    "total_committed": 911,
+    "agent_percentage": 99.45115257958288
+  },
+  "transcript_path": ".claude/projects/-Users-hieudinh-Documents-my-projects-CVsubject/2c19eac5-a431-4d94-b080-f97486ff792b.jsonl"
+}
