@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "d31fb2181eb0",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "models/plots/hagrid_samples.png",
+    "models/plots/interaction_model.png",
+    "models/plots/mediapipe_landmarks.png",
+    "outputs/hagrid_samples.png",
+    "outputs/interaction_model.png",
+    "outputs/mediapipe_landmarks.png",
+    "outputs/presentation.pdf",
+    "outputs/presentation.tex",
+    "outputs/report.pdf",
+    "outputs/report.tex",
+    "outputs/research-application-papers.md",
+    "outputs/script_vi.md",
+    "outputs/script_vi.pdf"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d3/1fb2181eb0/0/metadata.json",
+      "transcript": "/d3/1fb2181eb0/0/full.jsonl",
+      "context": "/d3/1fb2181eb0/0/context.md",
+      "content_hash": "/d3/1fb2181eb0/0/content_hash.txt",
+      "prompt": "/d3/1fb2181eb0/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 4712286,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 522,
+    "api_call_count": 44
+  }
+}
