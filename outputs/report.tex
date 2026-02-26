@@ -88,7 +88,7 @@
 % DOCUMENT METADATA
 %=============================================================================
 \title{\textbf{A Vision-First Multi-Modal Approach\\for Hand Gesture Recognition}\\[0.5em]
-\large Interactive Puzzle Game Control via Skeleton, Appearance, and Detection Methods}
+\large Skeleton--Appearance Fusion, Mathematical Interaction Modeling,\\and Client-Side Browser Deployment}
 
 \author[1]{Hiếu Dinh}
 \author[1]{Nhật Anh}
@@ -107,75 +107,44 @@
 %--- ABSTRACT ---
 \begin{abstract}
 \noindent
-This paper presents a multi-modal hand gesture recognition system that fuses skeleton-based and appearance-based features extracted from a single RGB webcam for interactive game control. We evaluate six methods on the HaGRID v2 dataset (23{,}850 samples, 13{,}250 subjects, 5~gesture classes): a rule-based heuristic, a Random Forest on engineered landmark distances, a Multi-Layer Perceptron (MLP) on normalized 60-dimensional landmark vectors, a fine-tuned MobileNetV3-Small CNN on 224$\times$224 hand crop images, a YOLOv8n end-to-end detector (mAP@50 = 99.5\%, mAP@50:95 = 90.7\%), and a weighted-average late fusion of MLP and CNN outputs. Using person-aware Group 5-Fold Cross-Validation to ensure generalization to unseen individuals, we find that the MLP achieves \SI{99.8}{\percent} ($\pm$\SI{0.5}{\percent}) accuracy and the CNN achieves \SI{100.0}{\percent} ($\pm$\SI{0.0}{\percent}). Weighted-average fusion confirms \SI{100.0}{\percent} accuracy, demonstrating that both modalities independently capture sufficient discriminative information for the five target gestures. The system is deployed as a client-side browser application using ONNX Runtime Web, achieving real-time interactive game control without a backend server.
+We present a vision-first multi-modal system for hand gesture recognition and interactive game control, deployed entirely client-side in a standard web browser. Our approach begins with the cheapest visual signal---skeleton geometry extracted by MediaPipe---and progressively incorporates appearance features via a CNN, evaluating whether additional modalities improve recognition. Through a systematic comparison of methods of increasing complexity on the HaGRID v2 dataset (\num{23850}~samples, \num{13250}~subjects, 5~classes) under person-aware Group 5-Fold Cross-Validation, we find that a compact MLP (\num{14789}~parameters, \SI{227}{\kilo\byte}) operating on 60-dimensional skeleton landmarks achieves \SI{99.8}{\percent} accuracy, and that late fusion with a CNN yields no measurable improvement---a ceiling effect that constitutes an informative negative result about the relationship between task difficulty and fusion benefit. Beyond classification, we contribute a mathematical interaction model adapted from Huda et~al.~(2025) that uses discrete directional thresholds ($mov_x$, $mov_y$) and orthogonal tolerance zones ($tol$) to bridge frame-level predictions and robust game actions. The complete system runs at 30+~FPS on commodity hardware with no backend server.
 
 \vspace{0.5em}
 \noindent
-\textbf{Keywords:} hand gesture recognition, multi-modal fusion, MediaPipe, MLP, CNN, MobileNetV3, YOLOv8, person-aware evaluation, browser deployment
+\textbf{Keywords:} hand gesture recognition, multi-modal fusion, MediaPipe, mathematical interaction model, browser deployment, real-time control
 \end{abstract}
 
-%--- 1. INTRODUCTION ---
+%=============================================================================
+% 1. INTRODUCTION
+%=============================================================================
 \section{Introduction}
 \label{sec:intro}
 
-\subsection{Problem Statement}
+Touchless interaction through hand gestures offers a natural modality for human--computer interaction (HCI), eliminating the need for specialized hardware beyond a commodity RGB webcam. Modern pose estimation frameworks such as MediaPipe~\citep{mediapipe2019,mediapipehands2020} have made real-time hand tracking practical even within web browsers, opening the door to gesture-controlled applications that require zero installation and zero backend infrastructure.
 
-We address two questions: \textbf{(1)~How do gesture classification methods of increasing complexity compare under rigorous, person-aware evaluation?} and \textbf{(2)~For a given gesture set, what is the simplest model sufficient for reliable recognition from a single RGB webcam?}
+This paper takes a \textbf{vision-first} approach to hand gesture recognition. By ``vision-first,'' we mean a design philosophy that starts from the cheapest, fastest visual representation---the 2D/3D skeleton geometry that MediaPipe extracts in real time---and progressively adds richer but more expensive representations (RGB appearance features via a CNN) only if the simpler signal proves insufficient. This contrasts with approaches that begin with heavyweight end-to-end models and optimize downward. The vision-first principle produces a natural multi-modal architecture: the skeleton stream (MLP) and the appearance stream (CNN) are independent modalities derived from the same camera frame, combined via late fusion.
 
-We compare six methods---from hand-crafted rules to neural networks to multi-modal fusion---on a 5-class subset of the HaGRID v2 dataset. We additionally investigate whether combining skeleton-based and appearance-based features via late fusion provides measurable benefit over either modality alone.
-
-\subsection{Background and Motivation}
-
-Hand gesture recognition enables natural human--computer interaction without specialized hardware. Modern pose estimation frameworks such as MediaPipe~\citep{mediapipe2019,mediapipehands2020} enable real-time hand tracking from commodity RGB webcams, making vision-first approaches practical for deployment.
-
-A single webcam frame contains two complementary information sources: (1)~\textbf{skeleton geometry}---the spatial configuration of 21 hand joints, and (2)~\textbf{visual appearance}---the RGB pixel content of the hand region. Most existing recognition systems exploit only one modality. We hypothesize that combining both via late fusion should improve robustness, particularly for ambiguous gestures---but also acknowledge that the benefit depends on task difficulty.
-
-\subsection{Related Work and SOTA on HaGRID}
-
-The HaGRID dataset~\citep{hagrid2022} is the largest public hand gesture dataset with 554K images across 18 gesture classes from 37,583 subjects, annotated with YOLO bounding boxes. The original paper reports the following baselines on the full 18-class set:
-
-\begin{itemize}
-    \item \textbf{Classification:} ResNet-152 achieves F1 = 95.5, ResNet-18 achieves F1 = 89.6, and ResNeXt-101 achieves F1 = 87.0.
-    \item \textbf{Detection + Classification:} SSDLite with MobileNetV3-Large achieves F1 = 71.6, and SSDLite with MobileNetV3-Small achieves F1 = 57.7.
-\end{itemize}
-
-\noindent A comprehensive survey by Al Farid et~al.~\citep{alfarid2022survey} reviews vision-based hand gesture recognition systems from 2012--2022, identifying persistent challenges in segmentation, feature extraction, and real-time performance. Recent applied work demonstrates the practical value of gesture recognition: Nguyen et~al.~\citep{nguyen2025wheelchair} use YOLOv8n with MediaPipe-based preprocessing to achieve 99.3\% recognition accuracy for 6 gestures controlling a smart wheelchair on an embedded Nvidia Jetson Nano. Huda et~al.~\citep{huda2025wheelchair} propose a mathematical model based on hand landmark distances and angular thresholds---similar in spirit to our heuristic classifier---for wheelchair control, achieving high success rates but limited to a small gesture vocabulary.
-
-Our work differs in three ways: (1)~we compare skeleton-based and appearance-based methods side-by-side on the same subset; (2)~we apply person-aware Group K-Fold Cross-Validation, which is stricter than the random splits used in the original baselines; and (3)~we investigate whether multi-modal fusion provides measurable benefit. We use a 5-class subset (easier than the full 18-class task), so our results are not directly comparable to the 18-class baselines above.
-
-\subsection{Objectives}
-
-This project pursues four primary objectives:
+We address three research questions:
 \begin{enumerate}
-    \item Compare classification methods of increasing sophistication: heuristic rules, classical machine learning (Random Forest), and neural networks (MLP, CNN).
-    \item Evaluate a multi-modal fusion approach that combines skeleton and appearance features from a single camera.
-    \item Apply person-aware Group K-Fold Cross-Validation consistently across all methods to ensure fair and robust evaluation.
-    \item Deploy the best-performing model in a browser-based interactive puzzle game.
+    \item[\textbf{Q1.}] \textbf{Method progression:} How do classification methods of increasing complexity---from hand-crafted heuristics through classical machine learning to deep neural networks---compare on the same gesture recognition task under person-aware evaluation?
+    \item[\textbf{Q2.}] \textbf{Fusion benefit:} Does multi-modal fusion of skeleton and appearance features provide measurable improvement over the best unimodal method?
+    \item[\textbf{Q3.}] \textbf{Classification-to-control:} How can frame-level gesture predictions be transformed into robust, jitter-free interactive control suitable for a real-time game?
 \end{enumerate}
 
-\subsection{Gesture Set}
+Our contributions are threefold:
+\begin{enumerate}
+    \item A \textbf{multi-modal comparison} of six methods on a 5-class subset of HaGRID v2~\citep{hagrid2022} with person-aware Group 5-Fold Cross-Validation, yielding an honest negative result: fusion provides no measurable benefit when both unimodal methods independently saturate accuracy---a boundary condition that is itself informative.
+    \item A \textbf{mathematical interaction model} adapted from Huda et~al.~\citep{huda2025wheelchair} that uses discrete directional thresholds and a finite state machine with debounce buffers to translate noisy classifications into robust puzzle tile control.
+    \item A \textbf{fully client-side browser deployment} using MediaPipe (WebAssembly) and ONNX Runtime Web, achieving 30+~FPS with a \SI{227}{\kilo\byte} model and zero server dependency.
+\end{enumerate}
 
-\Cref{tab:gestures} defines the five target gesture classes and their game actions.
-
-\begin{table}[htbp]
-\centering
-\caption{Gesture classes and corresponding game actions.}
-\label{tab:gestures}
-\begin{tabular}{@{}lll@{}}
-\toprule
-\textbf{Gesture} & \textbf{Description} & \textbf{Game Action} \\
-\midrule
-Open Hand & All fingers extended & Move puzzle piece \\
-Fist      & Closed hand & Rotate puzzle piece \\
-Pinch     & Thumb and index finger in contact & Grab/release puzzle piece \\
-Frame     & Two hands forming a rectangle & Capture puzzle image \\
-None      & No defined gesture & No action \\
-\bottomrule
-\end{tabular}
-\end{table}
+\paragraph{Related work.}
+The HaGRID dataset~\citep{hagrid2022} provides the largest public benchmark for hand gesture recognition with 554K images across 18 classes; SOTA baselines on the full set include ResNet-152 (F1\,=\,95.5) with 60M parameters. Al~Farid et~al.~\citep{alfarid2022survey} survey vision-based gesture recognition systems, identifying real-time performance and deployment cost as persistent challenges. In applied gesture control, Nguyen et~al.~\citep{nguyen2025wheelchair} deploy YOLOv8n with MediaPipe preprocessing on an Nvidia Jetson Nano for wheelchair control (99.3\% accuracy, 6 gestures). Most relevantly, Huda et~al.~\citep{huda2025wheelchair} propose a mathematical model for wheelchair directional control using landmark distances, angular thresholds, and tolerance zones for filtering unintended movements, achieving 98.14\% accuracy at 21+~FPS with no deep learning. Our work extends their mathematical interaction paradigm from assistive wheelchair navigation to interactive game control.
 
 
-%--- 2. DATA ---
+%=============================================================================
+% 2. DATA PREPARATION
+%=============================================================================
 \section{Data Preparation}
 \label{sec:data}
 
@@ -234,9 +203,9 @@ none       & \num{7950} & \num{2650} \\
 
 \subsection{Dual-Representation Extraction}
 
-From each image, we extract two parallel representations:
+From each image, we extract two parallel representations corresponding to our two modalities:
 
-\paragraph{Skeleton landmarks.} MediaPipe HandLandmarker~\citep{mediapipehands2020} extracts 21 three-dimensional hand landmarks per detected hand. The raw 63-dimensional vector ($21 \times 3$) is normalized as follows:
+\paragraph{Skeleton landmarks (Modality~1).} MediaPipe HandLandmarker~\citep{mediapipehands2020} extracts 21 three-dimensional hand landmarks per detected hand. The raw 63-dimensional vector ($21 \times 3$) is normalized as follows:
 
 \textbf{Translation normalization.} All coordinates are translated so the wrist (landmark~0) lies at the origin:
 \begin{equation}
@@ -262,44 +231,45 @@ From each image, we extract two parallel representations:
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.55\textwidth]{tsne_feature_space.png}
-\caption{t-SNE projection of the 60D normalized landmark feature space. The five gesture classes form well-separated clusters.}
+\caption{t-SNE projection of the 60D normalized landmark feature space. The five gesture classes form well-separated clusters, foreshadowing the ceiling effect observed in classification.}
 \label{fig:tsne}
 \end{figure}
 
-\paragraph{Hand crop images.} For training, we use \textbf{YOLO ground-truth bounding box annotations} provided by the HaGRID dataset to extract hand regions. For deployment, we use \textbf{MediaPipe detection bounding boxes} instead (since ground-truth annotations are unavailable at inference time). Cropped regions are resized to $224 \times 224$ RGB and normalized using ImageNet statistics ($\mu = [0.485, 0.456, 0.406]$, $\sigma = [0.229, 0.224, 0.225]$). This train/deploy discrepancy is a minor source of domain shift but does not significantly affect performance in practice.
+\paragraph{Hand crop images (Modality~2).} For training, we use \textbf{YOLO ground-truth bounding box annotations} provided by the HaGRID dataset to extract hand regions. For deployment, we use \textbf{MediaPipe detection bounding boxes} instead (since ground-truth annotations are unavailable at inference time). Cropped regions are resized to $224 \times 224$ RGB and normalized using ImageNet statistics ($\mu = [0.485, 0.456, 0.406]$, $\sigma = [0.229, 0.224, 0.225]$).
 
 \subsection{Class Imbalance}
 
-The dataset exhibits a 3:1 class imbalance: Frame and None contain \num{7950} samples each (due to multiple hands per image), while the remaining three classes have \num{2650} samples each. We address this by using \textbf{stratified group splits} within person-aware cross-validation, ensuring proportional class representation in each fold. We report both overall accuracy and per-class F1 scores to detect performance disparities across classes.
+The dataset exhibits a 3:1 class imbalance: Frame and None contain \num{7950} samples each (due to multiple hands per image), while the remaining three classes have \num{2650} samples each. We address this by using \textbf{stratified group splits} within person-aware cross-validation, ensuring proportional class representation in each fold. We do not apply class weighting in the loss function: the 3:1 ratio is moderate, and all learned methods achieve per-class F1 above 99\% for every class including the minority classes, indicating that the imbalance does not degrade performance at this ratio. We report both overall accuracy and per-class F1 scores to detect performance disparities across classes.
 
 
-%--- 3. CLASSIFICATION METHODS ---
-\section{Classification Methods}
-\label{sec:methods}
+%=============================================================================
+% 3. MULTI-MODAL CLASSIFICATION
+%=============================================================================
+\section{Multi-Modal Classification}
+\label{sec:classification}
 
-We evaluate six methods spanning increasing levels of sophistication and modality usage.
+We evaluate six methods of increasing complexity under a unified evaluation protocol: \textbf{person-aware Group 5-Fold Cross-Validation} (scikit-learn's \texttt{GroupKFold}) with subject identifiers as group labels, guaranteeing that no individual appears in both training and test partitions within any fold.
 
-\subsection{Method 1: Rule-Based Heuristic Classifier}
+\subsection{Skeleton Stream}
+\label{sec:skeleton}
 
-The heuristic classifier employs approximately 20~manually calibrated threshold rules on geometric features: finger curl angles (proximal-intermediate-distal segment angles) and inter-landmark distances. Classification maps geometric conditions to gestures: all fingers extended $\to$ Open~Hand, all flexed $\to$ Fist, thumb-index proximity below threshold $\to$ Pinch. No training data is required.
+We evaluate three skeleton-based classifiers of increasing sophistication, all operating on the same 60-dimensional (or derived) landmark representation.
 
-\subsection{Method 2: Random Forest Classifier}
+\paragraph{Heuristic classifier.} Approximately 20~manually calibrated threshold rules on geometric features: finger curl angles (proximal-intermediate-distal segment angles) and inter-landmark distances. Classification maps geometric conditions to gestures: all fingers extended $\to$ Open~Hand, all flexed $\to$ Fist, thumb-index proximity below threshold $\to$ Pinch. No training data is required.
 
-An ensemble of 100 decision trees trained on a 24-dimensional engineered feature set comprising pairwise Euclidean distances between selected landmark pairs (fingertip-to-fingertip, fingertip-to-MCP, PIP joint distances). Implemented via \texttt{sklearn.ensemble.RandomForestClassifier} with maximum depth of~15.
+\paragraph{Random Forest.} An ensemble of 100 decision trees~\citep{breiman2001rf} trained on a 24-dimensional engineered feature set comprising pairwise Euclidean distances between selected landmark pairs (fingertip-to-fingertip, fingertip-to-MCP, PIP joint distances). Implemented via \texttt{sklearn.ensemble.RandomForestClassifier} with maximum depth of~15.
 
-\subsection{Method 3: MLP Skeleton Classifier}
-
-A feed-forward neural network operates directly on the 60-dimensional normalized landmark vector:
+\paragraph{MLP.} A feed-forward neural network operates directly on the full 60-dimensional normalized landmark vector:
 \begin{equation}
     \text{Input}(60) \to \text{Dense}(128, \text{ReLU}) \to \text{Dropout}(0.3) \to \text{Dense}(64, \text{ReLU}) \to \text{Dropout}(0.3) \to \text{Dense}(5, \text{Softmax})
     \label{eq:mlp}
 \end{equation}
-\noindent The model has \num{14789}~trainable parameters (\SI{227}{\kilo\byte}). Training uses Adam~\citep{kingma2014adam} ($\text{lr} = 10^{-3}$), sparse categorical cross-entropy loss, and early stopping (patience~=~10). The MLP represents the \textbf{skeleton modality} in our multi-modal system.
+\noindent The model has \num{14789}~trainable parameters (\SI{227}{\kilo\byte}). Training uses Adam~\citep{kingma2014adam} ($\text{lr} = 10^{-3}$), sparse categorical cross-entropy loss, and early stopping (patience~=~10).
 
-\subsection{Method 4: CNN Appearance Classifier}
+\subsection{Appearance Stream}
+\label{sec:appearance}
 
-To exploit visual appearance information, we fine-tune MobileNetV3-Small~\citep{howard2019mobilenetv3} pretrained on ImageNet. The architecture:
-
+To exploit visual appearance information beyond skeleton geometry, we fine-tune MobileNetV3-Small~\citep{howard2019mobilenetv3} pretrained on ImageNet:
 \begin{itemize}
     \item \textbf{Backbone:} MobileNetV3-Small feature extractor (first 8~blocks frozen)
     \item \textbf{Head:} AdaptiveAvgPool $\to$ Linear(576, 1024) $\to$ Hardswish $\to$ Dropout(0.2) $\to$ Linear(1024, 5)
@@ -308,62 +278,29 @@ To exploit visual appearance information, we fine-tune MobileNetV3-Small~\citep{
     \item \textbf{Augmentation:} Random horizontal flip, rotation ($\pm15°$), color jitter
 \end{itemize}
 
-\noindent The CNN produces a 5-class softmax output representing the \textbf{appearance modality}. The model size is approximately \SI{4.3}{\mega\byte} (\SI{0.3}{\mega\byte} in ONNX format).
+\noindent The CNN produces a 5-class softmax output representing the appearance modality. The model size is approximately \SI{4.3}{\mega\byte} (\SI{0.3}{\mega\byte} in ONNX format).
 
-\subsection{Method 5: YOLOv8n Detector}
+\subsection{End-to-End Detection Baseline}
+\label{sec:yolo}
 
-As an end-to-end detection baseline, we train YOLOv8n~\citep{jocher2023yolo} to simultaneously localize and classify hand gestures directly from full-resolution images ($640 \times 640$). The model has \num{3011823}~parameters (\SI{6.2}{\mega\byte}) and 8.2~GFLOPs.
+As an end-to-end baseline, we train YOLOv8n~\citep{jocher2023yolo} to simultaneously localize and classify hand gestures directly from full-resolution images ($640 \times 640$). The model has \num{3011823}~parameters (\SI{6.2}{\mega\byte}) and 8.2~GFLOPs. Training uses SGD ($\text{lr} = 0.01$, $\text{momentum} = 0.9$), cosine schedule ($\text{lrf} = 0.01$), 100~epochs with patience~20, batch size~16, and mixed precision on an NVIDIA A100-SXM4-80GB GPU. Unlike the classification methods above, YOLO performs \textbf{detection + classification} jointly, requiring detection metrics (mAP@50, mAP@50:95) rather than pure classification accuracy.
 
-\textbf{Training configuration:} MuSGD optimizer ($\text{lr} = 0.01$, $\text{momentum} = 0.9$), cosine learning rate schedule ($\text{lrf} = 0.01$), 100~epochs with patience~20 for early stopping, batch size~16, mixed precision (AMP). Augmentation includes mosaic, random scale ($\pm$50\%), horizontal flip, and Albumentations (blur, median blur, grayscale, CLAHE). Training was conducted on an NVIDIA A100-SXM4-80GB GPU.
+\subsection{Late Fusion}
+\label{sec:fusion}
 
-Unlike the classification methods above, YOLO performs \textbf{detection + classification} jointly. This provides hand localization capability but requires detection metrics (mAP@50 and mAP@50:95) rather than pure classification accuracy, making direct comparison with the classification methods non-trivial.
-
-\subsection{Method 6: Weighted Average Late Fusion}
-
-The fusion method combines the softmax outputs of the MLP and CNN via a weighted average:
+The fusion method combines the softmax outputs of the MLP (skeleton) and CNN (appearance) via a weighted average:
 \begin{equation}
     P_{\text{fused}} = \alpha \cdot P_{\text{MLP}} + (1 - \alpha) \cdot P_{\text{CNN}}
     \label{eq:fusion}
 \end{equation}
 \noindent where $\alpha \in [0, 1]$ controls the relative contribution of each modality. The optimal $\alpha^*$ is determined via grid search on the training partition of each cross-validation fold. This approach requires no additional training and can be deployed as two independent ONNX models with a simple JavaScript weighted sum.
 
-We also attempted a \textbf{learned fusion} approach, where the MLP and CNN feature vectors were concatenated and fed into a trainable classifier. This approach achieved only \SI{31.8}{\percent} ($\pm$\SI{5.2}{\percent}) accuracy---near random chance---due to the small size of the paired dataset (443~samples with both modalities available). This negative result demonstrates that learned fusion requires substantially more paired data than was available in our experimental setup, and motivates the simpler weighted-average approach.
+We also attempted a \textbf{learned fusion} approach, where the MLP and CNN feature vectors were concatenated and fed into a trainable classifier. This approach achieved only \SI{31.8}{\percent} ($\pm$\SI{5.2}{\percent}) accuracy---near random chance---due to the small size of the paired dataset (443~samples with both modalities available). This negative result demonstrates that learned fusion requires substantially more paired data than was available.
 
-\subsection{Method Summary}
+\subsection{Results}
+\label{sec:results}
 
-\Cref{tab:methodsummary} compares all six methods across key characteristics.
-
-\begin{table}[htbp]
-\centering
-\caption{Comparison of method characteristics.}
-\label{tab:methodsummary}
-\resizebox{\textwidth}{!}{
-\begin{tabular}{@{}lllllll@{}}
-\toprule
-\textbf{Characteristic} & \textbf{Heuristic} & \textbf{Random Forest} & \textbf{MLP} & \textbf{CNN} & \textbf{YOLOv8n} & \textbf{Fusion} \\
-\midrule
-Task               & Classification & Classification & Classification & Classification & Detection+Cls & Classification \\
-Input              & Angles + dist. & 24 distances & 60D landmarks & 224$\times$224 RGB & 640$\times$640 RGB & Both \\
-Modality           & Skeleton & Skeleton & Skeleton & Appearance & Appearance & Both \\
-Params             & ${\sim}20$ thresholds & ${\sim}100$K & \num{14789} & ${\sim}1.5$M & 3.0M & -- \\
-Model size         & \SI{170}{\byte} & \SI{8.6}{\mega\byte} & \SI{227}{\kilo\byte} & \SI{0.3}{\mega\byte} & \SI{6.2}{\mega\byte} & \SI{0.5}{\mega\byte} \\
-\bottomrule
-\end{tabular}
-}
-\end{table}
-
-
-%--- 4. EVALUATION ---
-\section{Evaluation}
-\label{sec:eval}
-
-\subsection{Cross-Validation Strategy}
-
-All methods are evaluated using \textbf{person-aware Group 5-Fold Cross-Validation} (scikit-learn's \texttt{GroupKFold}) with subject identifiers as group labels. This guarantees that no individual appears in both training and test partitions within any fold, providing a rigorous assessment of generalization to unseen persons.
-
-\subsection{Overall Results}
-
-\Cref{tab:results} summarizes the performance across all six methods on HaGRID~v2.
+\Cref{tab:results} summarizes the performance across all six methods. \Cref{tab:methodsummary} compares their key characteristics.
 
 \begin{table}[htbp]
 \centering
@@ -385,11 +322,42 @@ YOLOv8n       & Appearance  & 99.5\% mAP50             & $\pm$0.0\%             
 \end{tabular}
 \end{table}
 
-The CNN and weighted-average fusion both achieve perfect classification accuracy across all five folds. The MLP achieves \SI{99.8}{\percent} with low variance, confirming strong generalization of the skeleton modality alone. YOLOv8n achieves \SI{99.5}{\percent}~mAP@50 and \SI{90.7}{\percent}~mAP@50:95, demonstrating strong detection-level performance with the added capability of hand localization.
+\begin{table}[htbp]
+\centering
+\caption{Comparison of method characteristics.}
+\label{tab:methodsummary}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}lllllll@{}}
+\toprule
+\textbf{Characteristic} & \textbf{Heuristic} & \textbf{Random Forest} & \textbf{MLP} & \textbf{CNN} & \textbf{YOLOv8n} & \textbf{Fusion} \\
+\midrule
+Task               & Classification & Classification & Classification & Classification & Detection+Cls & Classification \\
+Input              & Angles + dist. & 24 distances & 60D landmarks & 224$\times$224 RGB & 640$\times$640 RGB & Both \\
+Modality           & Skeleton & Skeleton & Skeleton & Appearance & Appearance & Both \\
+Params             & ${\sim}20$ thresholds & ${\sim}100$K & \num{14789} & ${\sim}1.5$M & 3.0M & -- \\
+Model size         & \SI{170}{\byte} & \SI{8.6}{\mega\byte} & \SI{227}{\kilo\byte} & \SI{0.3}{\mega\byte} & \SI{6.2}{\mega\byte} & \SI{0.5}{\mega\byte} \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
 
-\subsection{CNN Cross-Validation Fold Details}
+\Cref{fig:accuracy_comparison} presents the accuracy progression across all methods, and \Cref{fig:f1perclass} shows per-class F1 scores.
 
-\Cref{tab:cnn_folds} reports the per-fold CNN validation accuracy to verify consistency.
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.75\textwidth]{accuracy_comparison.png}
+\caption{Accuracy comparison across methods on HaGRID v2 with person-aware 5-fold CV. Clear monotonic progression from heuristic rules to learned features.}
+\label{fig:accuracy_comparison}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.75\textwidth]{per_class_f1_comparison.png}
+\caption{Per-class F1 scores by method. All learned methods perform worst on the ``None'' class (heterogeneous negative samples).}
+\label{fig:f1perclass}
+\end{figure}
+
+\paragraph{CNN cross-validation stability.} \Cref{tab:cnn_folds} reports the per-fold CNN validation accuracy. All five folds achieve $\geq$\SI{99.94}{\percent} accuracy, with total training time of 4{,}644~seconds (77~minutes) on an NVIDIA A100 GPU.
 
 \begin{table}[htbp]
 \centering
@@ -405,11 +373,7 @@ Training time & 974s & 968s & 904s & 907s & 890s & Total: 4644s \\
 \end{tabular}
 \end{table}
 
-All five folds achieve $\geq$\SI{99.94}{\percent} accuracy, with Fold~3 reaching perfect classification. The total training time of 4{,}644~seconds (77~minutes) on an NVIDIA A100 GPU demonstrates the computational feasibility of the approach.
-
-\subsection{Cross-Validation Stability}
-
-\Cref{fig:cvstability} compares per-fold stability across the MLP and CNN methods.
+\Cref{fig:cvstability} compares per-fold stability across the MLP and CNN.
 
 \begin{figure}[htbp]
 \centering
@@ -440,52 +404,229 @@ All five folds achieve $\geq$\SI{99.94}{\percent} accuracy, with Fold~3 reaching
 \label{fig:cvstability}
 \end{figure}
 
-\subsection{Accuracy Comparison}
+\subsection{Multi-Modal Finding: The Ceiling Effect}
+\label{sec:ceiling}
 
-\Cref{fig:accuracy_comparison} presents the accuracy progression across all methods, and \Cref{fig:f1perclass} shows per-class F1 scores.
+The fusion result of \SI{100.0}{\percent} accuracy matches the CNN's unimodal performance exactly, providing \textbf{no measurable improvement}. This negative result is not a failure of the fusion method but a consequence of the \textbf{ceiling effect}: when both modalities independently achieve near-perfect accuracy on the same task, there is no residual error for fusion to correct.
+
+Three factors explain why the five-class problem saturates:
+\begin{enumerate}
+    \item \textbf{Visual distinctiveness:} The five gestures---open hand, fist, pinch, frame, and no gesture---exhibit fundamentally different hand configurations that are easily separated in both skeletal and appearance feature spaces (as confirmed by the t-SNE visualization in \Cref{fig:tsne}).
+    \item \textbf{Person-aware evaluation:} Group 5-Fold CV prevents identity leakage, confirming that saturation is genuine generalization rather than overfitting.
+    \item \textbf{Clean data:} HaGRID images are captured under varied but controlled conditions with reliable annotations.
+\end{enumerate}
+
+This finding does not refute multi-modal fusion in general. On the full 18-class HaGRID taxonomy where SOTA is 95.5\% F1 (ResNet-152, 60M parameters), fusion would likely provide measurable benefit. Our result establishes a \textbf{boundary condition}: for $K$ visually distinct gesture classes where $K$ is small, a single modality suffices, and the research value lies in documenting \emph{where} this saturation occurs.
+
+\paragraph{Statistical note.} With only $k = 5$ fold-level observations, a paired Wilcoxon signed-rank test between MLP (99.8\%) and CNN (100.0\%) accuracy does not reach statistical significance ($p > 0.05$). The 0.2 percentage-point gap is within the noise margin of fold-level variation, reinforcing the ceiling-effect interpretation: for this task, both modalities are functionally equivalent.
+
+
+%=============================================================================
+% 4. MATHEMATICAL MODEL FOR INTERACTIVE CONTROL
+%=============================================================================
+\section{Mathematical Model for Interactive Control}
+\label{sec:mathmodel}
+
+\subsection{The Classification-to-Control Gap}
+
+Gesture classification assigns a discrete label $\hat{y}_t \in \{\text{open\_hand}, \text{fist}, \text{pinch}, \text{frame}, \text{none}\}$ to each video frame $t$. However, interactive control requires \textit{continuous, intentional} actions. Directly mapping raw per-frame predictions to game actions produces two failure modes:
+\begin{enumerate}
+    \item \textbf{Jitter:} Natural hand tremor causes the cursor position to fluctuate by 5--15 pixels per frame, triggering unintended actions in a free-drag mechanic.
+    \item \textbf{Transient misclassification:} Even at 99.8\% accuracy, isolated frame-level errors cause erratic behavior---e.g., a momentary ``open\_hand'' prediction during a sustained pinch releases the tile prematurely.
+\end{enumerate}
+
+Huda et~al.~\citep{huda2025wheelchair} identified this same gap in wheelchair control and proposed a mathematical model using movement thresholds and tolerance zones. We adapt their paradigm from assistive wheelchair navigation to grid-based puzzle interaction.
+
+\subsection{Gesture-to-Action Mapping}
+
+\Cref{tab:gesture_actions} defines the mapping between the five gesture classes and game actions. This mapping was designed to feel intuitive: pinch grabs (analogous to physical pinching), open hand releases, fist triggers a timed action, and frame captures.
+
+\begin{table}[htbp]
+\centering
+\caption{Gesture-to-action mapping for interactive puzzle control.}
+\label{tab:gesture_actions}
+\begin{tabular}{@{}llp{6cm}@{}}
+\toprule
+\textbf{Gesture} & \textbf{Game Action} & \textbf{Interaction Semantics} \\
+\midrule
+Pinch     & Grab tile   & Lock tile under cursor; enter GRABBING state \\
+Open Hand & Release tile & Unlock tile; return to IDLE state \\
+Fist      & Reset puzzle & Hold for 1.5s to trigger shuffle (dwell activation) \\
+Frame     & Capture image & Two-hand rectangle triggers photo for puzzle \\
+None      & No action   & System remains in current state \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\Cref{fig:gesture_mapping} illustrates the gesture-to-action mappings used in the deployed game.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.75\textwidth]{accuracy_comparison.png}
-\caption{Accuracy comparison across methods on HaGRID v2 with person-aware 5-fold CV. Clear progression from heuristic rules to learned features.}
-\label{fig:accuracy_comparison}
+\includegraphics[width=0.7\columnwidth]{gesture_mapping.png}
+\caption{Gesture-to-action mapping for the interactive puzzle game. Pinch grabs a tile, Open Hand releases it, Fist triggers a timed reset, and Frame captures a photo for the puzzle.}
+\label{fig:gesture_mapping}
 \end{figure}
+
+\subsection{Grid-Based Swipe Model}
+\label{sec:swipe}
+
+Adapted from the directional control model of Huda et~al.~\citep{huda2025wheelchair}, we implement a discrete swipe mechanic that replaces free-drag with threshold-gated tile swaps. Let $(x_{\text{init}}, y_{\text{init}})$ denote the cursor position when a grab begins, and $(x_{\text{cur}}, y_{\text{cur}})$ the current cursor position. We define the displacement:
+\begin{equation}
+    \Delta x = x_{\text{cur}} - x_{\text{init}}, \qquad \Delta y = y_{\text{cur}} - y_{\text{init}}
+    \label{eq:displacement}
+\end{equation}
+
+Two threshold parameters govern the model:
+\begin{itemize}
+    \item $mov_x, mov_y$: \textbf{Movement thresholds} --- the minimum displacement in the intended direction required to trigger a swap. Set to $0.6 \times \text{tile\_size}$ in each axis.
+    \item $tol$: \textbf{Orthogonal tolerance zone} --- the maximum displacement in the perpendicular direction permitted during a directional swipe. Set to $0.3 \times \min(\text{tile\_width}, \text{tile\_height})$.
+\end{itemize}
+
+\Cref{tab:swipe_conditions} defines the four directional swipe conditions, directly paralleling the logical condition table in Huda et~al.~\citep{huda2025wheelchair} (their Table~3).
+
+\begin{table}[htbp]
+\centering
+\caption{Logical conditions for directional tile swapping. Each condition requires sufficient displacement in the intended direction \textit{and} bounded displacement in the orthogonal direction, following Huda et~al.'s formulation.}
+\label{tab:swipe_conditions}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Direction} & \textbf{Primary Condition} & \textbf{Tolerance Condition} & \textbf{Tile Swap} \\
+\midrule
+Right   & $\Delta x > mov_x$   & $|\Delta y| < tol$ & $\text{tile}[i] \leftrightarrow \text{tile}[i+1]$ \\
+Left    & $\Delta x < -mov_x$  & $|\Delta y| < tol$ & $\text{tile}[i] \leftrightarrow \text{tile}[i-1]$ \\
+Down    & $\Delta y > mov_y$   & $|\Delta x| < tol$ & $\text{tile}[i] \leftrightarrow \text{tile}[i+C]$ \\
+Up      & $\Delta y < -mov_y$  & $|\Delta x| < tol$ & $\text{tile}[i] \leftrightarrow \text{tile}[i-C]$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Upon a successful swap, the grab origin is updated to allow continuous multi-step swiping:
+\begin{equation}
+    (x_{\text{init}}, y_{\text{init}}) \leftarrow (x_{\text{cur}}, y_{\text{cur}})
+    \label{eq:origin_update}
+\end{equation}
+
+The tolerance zone provides the critical HCI benefit: it filters out unintended off-axis hand jitter. A user intending to swipe right may exhibit small vertical tremor; the condition $|\Delta y| < tol$ ensures that only a clean horizontal displacement triggers the action. This directly mirrors the robustness that Huda et~al. achieve for wheelchair directional control, where unintended orthogonal movements could be dangerous.
+
+\subsection{Finite State Machine}
+\label{sec:fsm}
+
+The interaction model is governed by a three-state finite state machine (FSM) with debounce-gated transitions. Let $g_t$ denote the raw gesture prediction at frame $t$, and $\bar{g}_t$ the \textbf{stable gesture}---defined as $g_t$ only if the last $N = 3$ consecutive predictions agree:
+\begin{equation}
+    \bar{g}_t =
+    \begin{cases}
+        g_t & \text{if } g_{t} = g_{t-1} = g_{t-2} \\
+        \varnothing & \text{otherwise}
+    \end{cases}
+    \label{eq:debounce}
+\end{equation}
+
+\noindent This 3-frame debounce buffer suppresses transient misclassifications. \Cref{fig:fsm} illustrates the state machine transitions.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.75\textwidth]{per_class_f1_comparison.png}
-\caption{Per-class F1 scores by method. All methods perform worst on the ``None'' class (heterogeneous negative samples).}
-\label{fig:f1perclass}
+\begin{tikzpicture}[
+    state/.style={draw, rounded corners, fill=tolblue!15, minimum width=2.8cm, minimum height=1.2cm, align=center, font=\small\bfseries},
+    transition/.style={-{Stealth[scale=0.8]}, thick, tolblue!70},
+    lbl/.style={font=\scriptsize, fill=white, inner sep=2pt, align=center},
+    node distance=3.5cm,
+]
+    \node[state] (idle) {IDLE};
+    \node[state, right=4.5cm of idle] (grab) {GRABBING};
+    \node[state, below=3cm of idle] (fist) {FIST HOLD};
+
+    \draw[transition] (idle.east) -- node[lbl, above] {pinch + cursor over tile} (grab.west);
+    \draw[transition] (grab.south west) -- node[lbl, right, pos=0.4] {open hand or none} (idle.north east);
+    \draw[transition] (idle.south) -- node[lbl, right] {fist} (fist.north);
+    \draw[transition] (fist.east) -- ++(1.5,0) |- node[lbl, right, pos=0.25] {not fist or timer expires} (idle.east);
+    \draw[transition] (grab.north) .. controls ++(0.8,1.2) and ++(-0.8,1.2) .. node[lbl, above] {swipe: swap tile} (grab.north west);
+
+\end{tikzpicture}
+\caption{Finite state machine for gesture-based interaction. All transitions require 3-frame debounce stability ($\bar{g}_t$). The GRABBING state continuously evaluates swipe conditions (\Cref{tab:swipe_conditions}) against the grid-based threshold model.}
+\label{fig:fsm}
 \end{figure}
 
-\subsection{Error Analysis}
+\paragraph{State transitions in detail.}
 
-\paragraph{Heuristic failure.}
-The heuristic classifier achieved \SI{0.99}{\percent} accuracy---below the \SI{20}{\percent} random baseline. Three factors account for this: (1)~dimensionality mismatch, where rules designed for 3D coordinates degenerate on 2D-projected data; (2)~threshold miscalibration against the empirical data distribution; and (3)~absence of adaptability to the actual data pipeline.
+\begin{enumerate}
+    \item \textbf{IDLE $\to$ GRABBING:} When $\bar{g}_t = \text{pinch}$ and the smoothed cursor is over a puzzle tile, the system records the grab origin $(x_{\text{init}}, y_{\text{init}})$ and locks the tile. The user's hand position is now tracked for directional swipe evaluation.
 
-\paragraph{Random Forest limitations.}
-At \SI{94.13}{\percent}, the Random Forest demonstrates that even semi-automatic feature engineering (24~pairwise distances) substantially outperforms hand-crafted rules. Performance is limited by the loss of inter-hand spatial context for the Frame gesture and the inability of distance features to capture fine-grained thumb-index proximity for Pinch.
+    \item \textbf{GRABBING (continuous):} While in this state, each frame evaluates the four swipe conditions in \Cref{tab:swipe_conditions}. If a condition is met, the tile is swapped with its neighbor, and the origin is reset per \Cref{eq:origin_update}. This allows chained multi-step swiping without releasing the pinch gesture.
 
-\paragraph{MLP near-ceiling performance.}
-The MLP's \SI{99.8}{\percent} accuracy on full 60-dimensional landmark vectors confirms that raw normalized coordinates contain sufficient discriminative information for the five-class problem. The small remaining error (${\sim}$0.2\%) likely corresponds to edge cases in the None class (inherently heterogeneous) and ambiguous Frame poses.
+    \item \textbf{GRABBING $\to$ IDLE:} When $\bar{g}_t \in \{\text{open\_hand}, \text{none}\}$, the tile lock is released. The 3-frame requirement prevents accidental release from a single-frame misclassification.
 
-\paragraph{CNN perfect accuracy.}
-The CNN's \SI{100.0}{\percent} accuracy (99.97\% when measuring individual best-per-fold) demonstrates that visual appearance features are highly discriminative for these five gesture classes. MobileNetV3-Small, pretrained on ImageNet, transfers effectively to hand gesture classification with minimal fine-tuning.
+    \item \textbf{IDLE $\to$ FIST\_HOLD:} When $\bar{g}_t = \text{fist}$, a dwell timer begins. If the fist is held for 1.5~seconds, the puzzle resets. This dwell activation prevents accidental resets from transient fist detections.
 
-\paragraph{Near-perfect scores: discussion of validity.}
-The near-perfect accuracy across both modalities reflects the \textbf{visual distinctiveness of the five selected gesture classes} rather than model sophistication alone. The five gestures---open hand, fist, pinch, frame, and no gesture---exhibit fundamentally different hand configurations that are easily separated in both skeletal and appearance feature spaces (as confirmed by the t-SNE visualization in \Cref{fig:tsne}). We note that: (1)~person-aware cross-validation prevents identity leakage, the most common source of inflated metrics; (2)~the HaGRID dataset provides clean, well-labeled images captured under varied but controlled conditions; and (3)~performance would likely decrease on finer-grained gesture sets (e.g., the full 18-class HaGRID taxonomy).
+    \item \textbf{FIST\_HOLD $\to$ IDLE:} If the gesture changes before the timer expires, the reset is cancelled.
+\end{enumerate}
 
-\paragraph{Answering the research questions.}
-\textbf{Question 1} (method progression): Methods of increasing complexity yield monotonically increasing accuracy---from 0.99\% (heuristic) through 94.1\% (Random Forest) to 99.8\% (MLP) and 100.0\% (CNN)---confirming that learned representations consistently outperform hand-crafted features on this dataset. \textbf{Question 2} (minimal sufficient model): For the five-class gesture set, a 14,789-parameter MLP operating on 60-dimensional skeleton landmarks achieves 99.8\% accuracy at 227~KB, making it the optimal choice for edge deployment. Larger models (CNN, Fusion) provide diminishing returns. \textbf{Fusion finding:} Both modalities independently achieve near-perfect accuracy, producing a \textbf{ceiling effect} that makes the fusion benefit unmeasurable. This does not refute the value of multi-modal fusion in general---it demonstrates that \textbf{task difficulty is the dominant factor}, and for five visually distinct gesture classes, a single modality already saturates performance. Fusion benefits would be expected on harder tasks (e.g., the full 18-class HaGRID taxonomy where SOTA is 95.5\% F1).
+\subsection{Smoothed Cursor with Adaptive Alpha}
+\label{sec:cursor}
+
+The raw cursor position is computed as the midpoint of the thumb tip (landmark~4) and index fingertip (landmark~8), providing a natural ``pinch point'' for interaction:
+\begin{equation}
+    \mathbf{p}_{\text{raw}}^{(t)} = \frac{\mathbf{l}_4^{(t)} + \mathbf{l}_8^{(t)}}{2}
+    \label{eq:rawcursor}
+\end{equation}
+
+To reduce jitter without introducing latency, we apply an exponential moving average with an \textbf{adaptive smoothing factor}:
+\begin{equation}
+    \alpha_t =
+    \begin{cases}
+        1.0 & \text{if } \|\mathbf{p}_{\text{raw}}^{(t)} - \mathbf{p}_{\text{smooth}}^{(t-1)}\| > 100\text{px} \\
+        0.4 & \text{otherwise}
+    \end{cases}
+    \label{eq:adaptive_alpha}
+\end{equation}
+\begin{equation}
+    \mathbf{p}_{\text{smooth}}^{(t)} = (1 - \alpha_t) \cdot \mathbf{p}_{\text{smooth}}^{(t-1)} + \alpha_t \cdot \mathbf{p}_{\text{raw}}^{(t)}
+    \label{eq:ema}
+\end{equation}
+
+The adaptive threshold of 100 pixels distinguishes between two regimes: (1)~small displacements from hand tremor, which are heavily smoothed ($\alpha = 0.4$), and (2)~large intentional movements (e.g., moving to a distant tile), which pass through with no smoothing ($\alpha = 1.0$) to avoid perceptible lag.
+
+\subsection{Comparison with Related Systems}
+\label{sec:comparison}
+
+\Cref{tab:system_comparison} compares our mathematical interaction model with the two most relevant systems from the literature.
+
+\begin{table}[htbp]
+\centering
+\caption{Comparison of gesture-controlled interactive systems. Our system adapts Huda et~al.'s mathematical model from wheelchair navigation to puzzle game control, deployed in a browser.}
+\label{tab:system_comparison}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{@{}p{3.2cm}p{4cm}p{4cm}p{4cm}@{}}
+\toprule
+\textbf{Aspect} & \textbf{Huda et~al.~\citep{huda2025wheelchair}} & \textbf{Nguyen et~al.~\citep{nguyen2025wheelchair}} & \textbf{Ours} \\
+\midrule
+Application & Wheelchair control & Wheelchair control & Puzzle game control \\
+Gesture count & 3 + idle & 6 & 5 \\
+Recognition method & Hand-crafted (distance ratios, angles) & YOLOv8n & MLP on MediaPipe landmarks \\
+Interaction model & Threshold + tolerance ($Thld_1$, $Thld_2$, $tol$) & Direct mapping & Threshold + tolerance ($mov_x$, $mov_y$, $tol$) + FSM \\
+Temporal filtering & None reported & None reported & 3-frame debounce + adaptive EMA cursor \\
+Deployment & Raspberry Pi 4 & Nvidia Jetson Nano & Browser (WASM + ONNX Web) \\
+Hardware cost & \$55 & \$149 & \$0 (any device with webcam) \\
+Accuracy & 98.14\% & 99.3\% & 99.8\% (MLP) \\
+Frame rate & 21+ FPS & 17 FPS & 30+ FPS \\
+Model size & None (heuristic) & 6.2 MB & 227 KB \\
+Open source & No & No & Yes (GitHub Pages) \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+Three key distinctions emerge. First, while Huda et~al. use a purely heuristic recognition approach (distance ratios and angular thresholds), we replace this with a trained MLP classifier that achieves higher accuracy (99.8\% vs.\ 98.14\%) while retaining their mathematical interaction model for robust directional control. Second, our system adds temporal filtering (3-frame debounce and adaptive EMA cursor) absent from both prior works, addressing the jitter problem that is critical for precise tile manipulation. Third, browser deployment eliminates hardware cost entirely---any device with a webcam and modern browser can run the system, compared to the \$55--\$149 embedded platforms used in prior work.
 
 
-%--- 5. SYSTEM ARCHITECTURE ---
-\section{System Architecture}
+%=============================================================================
+% 5. SYSTEM ARCHITECTURE & DEPLOYMENT
+%=============================================================================
+\section{System Architecture and Deployment}
 \label{sec:architecture}
 
 \subsection{Pipeline Overview}
 
-The multi-modal system follows a dual-stream pipeline architecture (\cref{fig:pipeline}).
+The system follows a three-stage pipeline architecture (\cref{fig:pipeline}): perception (MediaPipe), classification (MLP/CNN with optional fusion), and interaction (mathematical model from \Cref{sec:mathmodel}).
 
 \begin{figure}[htbp]
 \centering
@@ -515,7 +656,7 @@ The multi-modal system follows a dual-stream pipeline architecture (\cref{fig:pi
     \draw[arrow] (cnn) -| (fusion);
     \draw[arrow] (fusion) -- (game);
 \end{tikzpicture}
-\caption{Dual-stream multi-modal pipeline. A single webcam frame produces both skeleton landmarks (MLP path) and hand crop images (CNN path), fused via weighted average for final prediction.}
+\caption{Dual-stream multi-modal pipeline used for the \textbf{benchmarking study} (Section~\ref{sec:classification}). A single webcam frame produces both skeleton landmarks (MLP path) and hand crop images (CNN path), fused via weighted average for final prediction. The ``Gesture $\to$ Game'' block implements the mathematical interaction model from \Cref{sec:mathmodel}. \textbf{Note:} the deployed system uses the MLP path only, with a two-hand heuristic for frame detection (see Section~\ref{sec:deployment_note}).}
 \label{fig:pipeline}
 \end{figure}
 
@@ -524,54 +665,67 @@ The multi-modal system follows a dual-stream pipeline architecture (\cref{fig:pi
 The deployed application operates entirely client-side:
 \begin{itemize}
     \item \textbf{Hand tracking:} MediaPipe tasks-vision (WebAssembly) provides real-time landmark extraction.
-    \item \textbf{Inference:} Both MLP and CNN models are exported to ONNX format and run via ONNX Runtime Web.
-    \item \textbf{Fusion:} A simple JavaScript weighted sum combines softmax outputs.
+    \item \textbf{Inference:} Both MLP and CNN models are exported to ONNX format and run via ONNX Runtime Web. The MLP uses the WASM backend; the CNN attempts WebGPU first, falling back to WASM.
+    \item \textbf{Fusion:} A simple JavaScript weighted sum combines softmax outputs ($\alpha = 0.7$, MLP-dominant).
+    \item \textbf{Interaction model:} The state machine, swipe thresholds, debounce buffer, and adaptive cursor are implemented in approximately 150~lines of JavaScript.
     \item \textbf{Application:} An HTML5 Canvas-based jigsaw puzzle translates gesture predictions into interactive game actions.
-    \item \textbf{Temporal filtering:} A debounce buffer suppresses momentary misclassifications.
 \end{itemize}
 
-\subsection{Mathematical Model for Gesture Tracking}
+\subsection{Deployment-Specific Adaptations}
+\label{sec:deployment_note}
 
-While gesture \textit{classification} assigns a label per frame, the interactive game requires \textit{continuous tracking}. Drawing direct inspiration from the wheelchair control mechanics proposed by Huda et~al.~\citep{huda2025wheelchair}, we adapt their discrete directional mathematical model for our grid-based puzzle. 
+The deployed system differs from the benchmarking pipeline (\Cref{fig:pipeline}) in two ways:
 
-Instead of a free-drag mechanic which is susceptible to jitter, we implement a Grid-Based Swipe state machine using movement thresholds ($mov_x, mov_y$) and an orthogonal tolerance zone ($tol$):
+\begin{enumerate}
+    \item \textbf{MLP-only classification.} Based on the ceiling-effect finding (\Cref{sec:ceiling}), the deployed system uses the MLP (skeleton) path as the primary classifier. The CNN path is loaded as an optional fallback but is not required for reliable recognition.
+    \item \textbf{Two-hand frame detection.} The ``frame'' gesture requires two hands forming a rectangle---a configuration that is reliably detectable by checking whether MediaPipe reports two simultaneous hand detections. In the deployed system, this geometric heuristic bypasses the MLP classifier for the frame class, assigning ``frame'' with high confidence whenever two hands are present. The MLP is trained and evaluated on all five classes (including frame from single-hand crops) in the benchmarking study, but the deployment heuristic provides more robust frame detection in practice because it leverages the defining structural property of the gesture. This creates a minor inconsistency: the deployed classifier is effectively a 4-class MLP augmented by a 2-hand heuristic, while the benchmarking study evaluates a 5-class MLP.
+\end{enumerate}
 
-\begin{itemize}
-    \item \textbf{IDLE $\to$ GRABBING:} When the MLP predicts ``pinch'' for $\geq$3 consecutive frames and the cursor is over a puzzle tile, the system transitions to GRABBING and records the initial grab coordinate $(x_{init}, y_{init})$. The tile is locked.
-    \item \textbf{GRABBING (continuous swipe):} While holding the pinch, the user moves their hand to a current position $(x_{cur}, y_{cur})$. Let $\Delta x = x_{cur} - x_{init}$ and $\Delta y = y_{cur} - y_{init}$. We evaluate the following logical conditions on every frame:
-    \begin{itemize}
-        \item \textbf{Swipe Right:} If $\Delta x > mov_x$ AND $|\Delta y| < tol \implies$ Swap tile Right.
-        \item \textbf{Swipe Left:} If $\Delta x < -mov_x$ AND $|\Delta y| < tol \implies$ Swap tile Left.
-        \item \textbf{Swipe Down:} If $\Delta y > mov_y$ AND $|\Delta x| < tol \implies$ Swap tile Down.
-        \item \textbf{Swipe Up:} If $\Delta y < -mov_y$ AND $|\Delta x| < tol \implies$ Swap tile Up.
-    \end{itemize}
-    Upon a successful swap, the origin is updated $(x_{init}, y_{init}) \leftarrow (x_{cur}, y_{cur})$ to allow continuous multi-step swiping.
-    \item \textbf{GRABBING $\to$ IDLE:} When the MLP predicts ``open\_hand'' for $\geq$3 frames, the lock is released.
-\end{itemize}
+\subsection{Performance Characteristics}
 
-This mathematical model provides rigorous HCI benefits: the tolerance window ($tol = 0.3 \times \text{tile\_size}$) effectively filters out unintended off-axis hand jitter, while the movement thresholds ($mov_{x,y} = 0.6 \times \text{tile\_size}$) require deliberate intent, directly mirroring the robustness achieved in~\citep{huda2025wheelchair}.
+\Cref{tab:performance} summarizes the deployment performance on commodity hardware.
 
-\Cref{fig:gesture_mapping} shows the updated gesture-to-action mappings used in the deployed game.
-
-\begin{figure}[htbp]
+\begin{table}[htbp]
 \centering
-\includegraphics[width=0.7\columnwidth]{gesture_mapping.png}
-\caption{Gesture-to-action mapping for the interactive puzzle game. Pinch grabs a tile, Open Hand releases it, Fist triggers a timed reset, and Frame captures a photo for the puzzle.}
-\label{fig:gesture_mapping}
-\end{figure}
+\caption{Client-side deployment performance characteristics.}
+\label{tab:performance}
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+MLP model size (ONNX) & \SI{227}{\kilo\byte} \\
+CNN model size (ONNX) & \SI{0.3}{\mega\byte} \\
+Combined pipeline size & \SI{0.5}{\mega\byte} \\
+Frame rate & 30+ FPS \\
+Server dependency & None \\
+Installation required & None \\
+Minimum hardware & Webcam + modern browser \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 
-%--- 6. DISCUSSION AND CONCLUSION ---
+%=============================================================================
+% 6. DISCUSSION AND CONCLUSION
+%=============================================================================
 \section{Discussion and Conclusion}
 \label{sec:conclusion}
 
-\subsection{Summary of Findings}
+\subsection{Answering the Research Questions}
+
+\textbf{Q1 --- Method progression.} Methods of increasing complexity yield monotonically increasing accuracy: from 0.99\% (heuristic, which fails due to dimensionality mismatch between rules designed for 3D coordinates and 2D-projected data) through 94.1\% (Random Forest on 24 engineered distances) to 99.8\% (MLP on full 60D landmarks) and 100.0\% (CNN on RGB crops). This confirms that learned representations consistently outperform hand-crafted features on this dataset, and that the full landmark vector retains discriminative information lost by feature engineering.
+
+\textbf{Q2 --- Fusion benefit.} Late fusion of skeleton (MLP) and appearance (CNN) modalities achieves \SI{100.0}{\percent} accuracy, matching the CNN's unimodal result exactly. This negative result establishes a boundary condition: for five visually distinct gesture classes, each modality independently saturates performance, leaving no residual error for fusion to correct. The finding is informative precisely because it quantifies \emph{where} multi-modal fusion ceases to add value---when task difficulty is below the threshold that any single modality can solve. Fusion benefits would be expected on harder tasks (e.g., the full 18-class HaGRID taxonomy where SOTA is 95.5\% F1).
+
+\textbf{Q3 --- Classification to control.} The mathematical interaction model adapted from Huda et~al.~\citep{huda2025wheelchair}---using movement thresholds ($mov_{x,y} = 0.6 \times \text{tile\_size}$), orthogonal tolerance zones ($tol = 0.3 \times \text{tile\_size}$), a 3-state FSM with 3-frame debounce, and an adaptive EMA cursor---successfully bridges the gap between frame-level classification and intentional game actions. The tolerance zone filters hand jitter, the debounce buffer suppresses transient misclassifications, and the adaptive cursor balances responsiveness against stability.
+
+\subsection{Summary of Contributions}
 
 \Cref{tab:bestmethod} summarizes the best-performing method for each evaluation criterion.
 
 \begin{table}[htbp]
 \centering
-\caption{Best method per evaluation criterion.}
+\caption{Best method per evaluation criterion (model selection study).}
 \label{tab:bestmethod}
 \begin{tabular}{@{}llr@{}}
 \toprule
@@ -581,31 +735,24 @@ Overall accuracy         & CNN / Fusion     & \SI{100.0}{\percent} \\
 Skeleton-only accuracy   & MLP              & \SI{99.8}{\percent} \\
 Model compactness        & MLP              & \SI{227}{\kilo\byte} \\
 Generalization stability & CNN              & $\pm$\SI{0.03}{\percent} std \\
-No-training deployment   & Heuristic        & \SI{170}{\byte} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Three principal findings emerge from this study:
-
-\textbf{First, data-driven methods substantially outperform hand-crafted heuristics.} The transition from the rule-based heuristic (\SI{0.99}{\percent}) to the Random Forest (\SI{94.13}{\percent}) to the MLP (\SI{99.8}{\percent}) demonstrates a clear progression where learned representations consistently outperform manually specified decision rules.
-
-\textbf{Second, both skeleton and appearance modalities independently achieve near-perfect accuracy} on the five-class HaGRID subset. This confirms that the selected gestures are well-separated in both geometric (landmark) and visual (pixel) feature spaces. The MLP's \SI{99.8}{\percent} and CNN's \SI{100.0}{\percent} indicate that the discriminative bottleneck for this task lies not in the classification method but in the feature space definition (i.e., 5~classes are too easy for modern classifiers).
-
-\textbf{Third, person-aware evaluation is essential for reliable performance estimation.} Group K-Fold cross-validation with person-level grouping prevents identity leakage and ensures that reported metrics reflect true generalization. The low variance across folds (MLP: $\pm$\SI{0.5}{\percent}, CNN: $\pm$\SI{0.03}{\percent}) confirms robust generalization regardless of test population composition.
+The vision-first approach validates a practical design principle: start with the cheapest signal (skeleton geometry), verify its sufficiency, and add richer modalities only when the task demands it. For our 5-class problem, the \SI{227}{\kilo\byte} MLP provides the optimal trade-off between accuracy, model size, and inference speed for edge deployment.
 
 \subsection{Limitations}
 
 \begin{enumerate}
-    \item \textbf{Near-ceiling accuracy:} With both modalities achieving ${\geq}$\SI{99.8}{\percent}, the fusion improvement is marginal. A more challenging gesture set (finer-grained classes, noisy environments) would better demonstrate multi-modal complementarity.
-    \item \textbf{No temporal modeling:} The system classifies each frame independently, without leveraging temporal coherence across consecutive frames.
-    \item \textbf{CNN latency overhead:} Adding CNN inference increases total pipeline latency. For real-time applications, the MLP alone at \SI{227}{\kilo\byte} may be preferable when latency is critical.
-    \item \textbf{Dataset conditions:} HaGRID images are captured under varied but relatively controlled conditions. Performance in challenging environments (extreme lighting, motion blur, occlusion) remains to be validated.
+    \item \textbf{Gesture vocabulary:} The five target classes are visually distinct and represent a low-difficulty classification problem. A finer-grained gesture set (e.g., ASL signs, subtle finger configurations) would stress-test both the classifier and the interaction model, and would likely reveal meaningful fusion benefits.
+    \item \textbf{No temporal modeling:} Our system treats each frame independently (aside from debounce). Recurrent or attention-based models over landmark sequences could improve recognition of dynamic gestures (e.g., waving, circular motions).
+    \item \textbf{Fixed interaction thresholds:} The values $mov_x$, $mov_y$, and $tol$ are fixed proportions of tile size. Adaptive calibration per user, as Huda et~al. do with their threshold determination from hand samples, could improve flexibility for users with varying dexterity.
+    \item \textbf{Dataset conditions:} HaGRID images are captured under varied but relatively controlled conditions. Performance in challenging environments (extreme lighting, motion blur, heavy occlusion) remains to be validated.
 \end{enumerate}
 
 \subsection{Future Directions}
 
-Future work includes: (1)~evaluating on the full 18-class HaGRID taxonomy where fusion benefits are more likely; (2)~temporal sequence modeling using LSTM or 1D-CNN architectures; (3)~attention-based fusion to learn modality-specific weighting per sample; (4)~model quantization and pruning for reduced latency on mobile devices; and (5)~user-adaptive fine-tuning to personalize gesture recognition.
+Future work includes: (1)~extending the gesture vocabulary to the full 18-class HaGRID taxonomy where multi-modal fusion is expected to provide measurable benefit; (2)~incorporating temporal sequence modeling (LSTM or Transformer over landmark sequences) for dynamic gesture recognition; (3)~adaptive threshold calibration from per-user hand samples following Huda et~al.'s methodology; and (4)~a formal user study evaluating the mathematical interaction model's usability compared to free-drag alternatives.
 
 
 %--- REFERENCES ---

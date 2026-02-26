@@ -49,8 +49,8 @@
 
 \graphicspath{{../models/plots/}{./}}
 
-\title[Hand Gesture Recognition]{A Vision-First Multi-Modal Approach\\for Hand Gesture Recognition}
-\subtitle{Bridging Classification to Interactive Puzzle Control}
+\title[Multi-Modal Hand Gesture]{A Vision-First Multi-Modal Approach\\for Hand Gesture Recognition}
+\subtitle{Interactive Puzzle Game Control via Skeleton \& Appearance Methods}
 \author[Hieu, Nhat Anh, Quoc Anh]{Hieu Dinh \and Nhat Anh \and Quoc Anh}
 \institute{Computer Vision Course}
 \date{\today}
@@ -62,234 +62,265 @@
     \titlepage
 \end{frame}
 
-% ======== 2. MOTIVATION & OBJECTIVES ========
-\begin{frame}{Motivation \& Objectives}
-    \centering
+
+% ======== 2. RESEARCH QUESTIONS ========
+\begin{frame}{Research Questions \& Pipeline}
     \vspace{0.5em}
 
-    {\large \textbf{Goal:} Build a fully client-side browser puzzle game\\controlled purely by hand gestures from a standard webcam.}
+    \begin{block}{Core Question}
+        \centering
+        Does fusing \textbf{skeleton} (geometric) and \textbf{appearance} (visual) features\\
+        from a single RGB camera improve hand gesture recognition?
+    \end{block}
 
-    \vspace{1.5em}
+    \vspace{0.8em}
     \begin{columns}[T]
         \begin{column}{0.48\textwidth}
-            \begin{block}{Q1: The Classification Challenge}
-                What is the most lightweight model sufficient for reliable hand gesture recognition? Does fusing Skeleton + Appearance help?
-            \end{block}
+            \textbf{Q1 (Multi-Modal):} How do methods of increasing complexity compare? Does fusion add value?
+
+            \vspace{0.6em}
+            \textbf{Q2 (Deployment):} What is the \textit{lightest model sufficient} for reliable control in a real-time browser game?
+
+            \vspace{0.6em}
+            \textbf{Q3 (Interaction):} How do we bridge frame-level predictions to jitter-free game control?
         \end{column}
         \begin{column}{0.48\textwidth}
-            \begin{block}{Q2: The Interaction Challenge}
-                How do we filter natural hand jitter to bridge frame-level classifications into smooth, intentional game control?
-            \end{block}
+            \centering
+            \begin{tikzpicture}[
+                box/.style={draw, rounded corners, fill=primary!8, minimum width=2.2cm, minimum height=0.8cm, align=center, font=\small, thick},
+                arrow/.style={-{Stealth[scale=0.8]}, thick, primary!70},
+                node distance=0.8cm,
+            ]
+                \node[box] (cam) {Webcam};
+                \node[box, below=of cam, fill=primary!15] (skel) {Skeleton\\{\scriptsize 60D landmarks}};
+                \node[box, right=1cm of skel, fill=accent!15] (app) {Appearance\\{\scriptsize 224$\times$224 RGB}};
+                \node[box, below=0.6cm of $(skel)!0.5!(app)$, fill=success!15] (fuse) {Fusion?};
+
+                \draw[arrow] (cam.south) -- ++(0,-0.4) -| (skel.north);
+                \draw[arrow] (cam.south) -- ++(0,-0.4) -| (app.north);
+                \draw[arrow] (skel) |- (fuse);
+                \draw[arrow] (app) |- (fuse);
+            \end{tikzpicture}
         \end{column}
     \end{columns}
-
-    \vspace{1.5em}
-    \begin{tikzpicture}[
-        box/.style={draw, rounded corners, fill=primary!8, minimum width=2.4cm, minimum height=1cm, align=center, font=\normalsize, thick},
-        arrow/.style={-{Stealth[scale=0.9]}, very thick, primary!70},
-        node distance=1cm,
-    ]
-        \node[box] (webcam) {Webcam};
-        \node[box, right=of webcam] (cv) {CV Model};
-        \node[box, right=of cv] (hci) {Math Filter};
-        \node[box, right=of hci] (game) {Game Action};
-
-        \draw[arrow] (webcam) -- (cv);
-        \draw[arrow] (cv) -- (hci);
-        \draw[arrow] (hci) -- (game);
-    \end{tikzpicture}
 \end{frame}
 
-% ======== 3. CLASSIFICATION BENCHMARK ========
-\begin{frame}{Classification Benchmark: Data \& Features}
+
+% ======== 3. DATA & TWO MODALITIES ========
+\begin{frame}{Dataset \& Two Feature Streams}
 \begin{columns}[c]
-\begin{column}{0.45\textwidth}
-    \textbf{Dataset: HaGRID v2 (Subset)}
+\begin{column}{0.42\textwidth}
+    \textbf{HaGRID v2 (Subset)}
     \begin{itemize}
         \item 23,850 samples, 13,250 subjects
-        \item 5 target classes (Pinch, Fist, Open, Frame, None)
-        \item \textbf{Person-aware split}: No subject overlap between Train \& Test
+        \item 5 classes: Pinch, Fist, Open, Frame, None
+        \item \textbf{Person-aware} Group 5-Fold CV\\(no subject leakage)
     \end{itemize}
     
-    \vspace{1.5em}
-    \textbf{Evaluated Models:}
+    \vspace{1em}
+    \textbf{Two Modalities from One Camera:}
     \begin{itemize}
-        \item Heuristics (0 params)
-        \item Random Forest ($\sim$100K params)
-        \item \textbf{MLP on Skeleton (60D, 14.7K)}
-        \item CNN on Appearance (RGB, 1.5M)
-        \item Fusion (MLP + CNN softmax)
+        \item \textcolor{primary}{\textbf{Skeleton:}} MediaPipe $\to$ 21~joints $\to$ normalized 60D vector
+        \item \textcolor{accent}{\textbf{Appearance:}} YOLO crop $\to$ 224$\times$224 RGB
     \end{itemize}
 \end{column}
-\begin{column}{0.5\textwidth}
+\begin{column}{0.53\textwidth}
     \centering
-    \textbf{Two Feature Streams}\\
+    \includegraphics[width=0.95\textwidth]{landmark_skeleton_per_class.png}
+    {\small \textit{Skeleton: geometrically distinct classes}}
+
     \vspace{0.8em}
-    \includegraphics[width=0.85\textwidth]{landmark_skeleton_per_class.png}
-    
-    {\small \textit{Skeleton (60D Vector via MediaPipe)}}
-    
-    \vspace{1.2em}
-    \includegraphics[width=0.85\textwidth]{tsne_feature_space.png}
-    
-    {\small \textit{Appearance (224x224 RGB)}}
+    \includegraphics[width=0.75\textwidth]{tsne_feature_space.png}
+    {\small \textit{t-SNE: already well-separated in 60D space}}
 \end{column}
 \end{columns}
 \end{frame}
 
-% ======== 4. RESULTS & CEILING EFFECT ========
-\begin{frame}{Results \& The "Ceiling Effect"}
+
+% ======== 4. METHODS & RESULTS ========
+\begin{frame}{Methods \& Results}
 \begin{columns}[T]
-\begin{column}{0.48\textwidth}
-    \vspace{1em}
-    \begin{tabular}{lrl}
+\begin{column}{0.52\textwidth}
+    \vspace{0.5em}
+    \textbf{Six methods, two modalities:}
+    
+    \vspace{0.5em}
+    \resizebox{\textwidth}{!}{
+    \begin{tabular}{llrrl}
     \toprule
-    \textbf{Method} & \textbf{Acc} & \textbf{Size} \\
+    \textbf{Method} & \textbf{Modality} & \textbf{Acc} & \textbf{Params} & \textbf{Size} \\
     \midrule
-    Random Forest & 94.1\% & 8.6 MB \\
-    \rowcolor{primary!15}
-    \textbf{MLP (Skeleton)} & \textbf{99.8\%} & \textbf{227 KB} \\
-    CNN (Appearance) & 100.0\% & 0.3 MB \\
-    Fusion & 100.0\% & 0.5 MB \\
+    Heuristic & Skeleton & 1.0\% & $\sim$20 & 170 B \\
+    Random Forest & Skeleton & 94.1\% & $\sim$100K & 8.6 MB \\
+    \rowcolor{primary!12}
+    \textbf{MLP} & \textbf{Skeleton} & \textbf{99.8\%} & \textbf{14.7K} & \textbf{227 KB} \\
+    CNN & Appear. & 100.0\% & 1.5M & 0.3 MB \\
+    YOLOv8n & Appear. & 99.5\%$^\dagger$ & 3.0M & 6.2 MB \\
+    \rowcolor{success!10}
+    \textbf{Fusion} & \textbf{Both} & \textbf{100.0\%} & --- & \textbf{0.5 MB} \\
     \bottomrule
     \end{tabular}
-
-    \vspace{1.5em}
-    \centering
-    \includegraphics[width=0.9\textwidth]{accuracy_comparison.png}
-\end{column}
-\begin{column}{0.5\textwidth}
-    \vspace{1em}
-    {\Large \textbf{The Core Finding:}}\\
-    \vspace{0.5em}
-    The 5 discrete classes are simply \textbf{too easy} for modern architectures.
+    }
+    {\scriptsize $^\dagger$mAP@50 (detection metric)}
     
-    \vspace{1em}
-    \begin{itemize}
-        \setlength\itemsep{0.8em}
-        \item A tiny \textbf{14K-parameter MLP} essentially saturates the dataset (99.8\%).
-        \item \textbf{Fusion offered zero value}: Geometric features alone perfectly resolve spatial ambiguity.
-        \item \textbf{Winner:} MLP on MediaPipe landmarks provides the ultimate lightweight engine.
-    \end{itemize}
+    \vspace{0.8em}
+    \textbf{Person-aware Group 5-Fold CV}\\
+    {\small 13,250 subjects $\times$ 5 folds\\= every person tested as ``unseen''}
+\end{column}
+\begin{column}{0.45\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{accuracy_comparison.png}
+
+    \vspace{0.3em}
+    \includegraphics[width=\textwidth]{per_class_f1_comparison.png}
+    
+    {\scriptsize Weakest: ``None'' (heterogeneous negatives)}
 \end{column}
 \end{columns}
 \end{frame}
 
-% ======== 5. CLASSIFICATION != CONTROL ========
-\begin{frame}{The Real Challenge: Classification $\neq$ Control}
+
+% ======== 5. KEY FINDING: CEILING EFFECT ========
+\begin{frame}{Key Finding: The Ceiling Effect}
     \centering
-    \vspace{1.5em}
-    
-    {\Large We solved classification (99.8\% accuracy).\\ But feeding raw frames directly to the game creates a terrible UX.}
-    
-    \vspace{2.5em}
+    \vspace{1em}
+
+    {\Large Both modalities \textbf{independently} achieve near-perfect accuracy.\\[0.3em]
+    Fusion adds \textbf{zero measurable benefit}.}
+
+    \vspace{2em}
     \begin{columns}[T]
-        \begin{column}{0.3\textwidth}
-            \centering
-            \textbf{Hand Jitter}\\
-            {\small Natural micro-movements cause erratic cursor jumps.}
-        \end{column}
-        \begin{column}{0.3\textwidth}
-            \centering
-            \textbf{Transient Errors}\\
-            {\small A single misclassified frame drops the puzzle piece.}
-        \end{column}
-        \begin{column}{0.3\textwidth}
-            \centering
-            \textbf{Lack of Intent}\\
-            {\small Users cannot hold perfectly still in 3D space.}
-        \end{column}
+    \begin{column}{0.45\textwidth}
+        \textbf{Why this is a valid finding:}
+        \begin{enumerate}
+            \setlength\itemsep{0.6em}
+            \item 5 gestures are \textbf{geometrically unambiguous}\\(fist $\neq$ open $\neq$ pinch)
+            \item Person-aware CV: \textbf{zero identity leakage}
+            \item 13,250 subjects, clean labels
+        \end{enumerate}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+        \textbf{What this tells us:}
+        \begin{enumerate}
+            \setlength\itemsep{0.6em}
+            \item \textbf{Task difficulty} is the dominant factor,\\not model capacity
+            \item For simple vocabularies:\\single-modality \textbf{MLP suffices}
+            \item Fusion value appears at harder tasks\\(full HaGRID: 18 classes, 95.5\% SOTA)
+        \end{enumerate}
+    \end{column}
     \end{columns}
-    
-    \vspace{3em}
+
+    \vspace{1.5em}
     \begin{block}{}
         \centering
-        \textit{"In order to make [the system] more suitable for disabled people... it needs to be more user-flexible... requires less energy" -- Huda et al. 2025}
+        \textbf{Practical answer:} Deploy a \textbf{227 KB MLP} on skeleton. It's enough.
     \end{block}
 \end{frame}
 
 
-% ======== 6. GRID-BASED SWIPE MATH ========
-\begin{frame}{Grid-Based Swipe Math (Huda et al. 2025)}
+% ======== 6. BEYOND CLASSIFICATION ========
+\begin{frame}{Beyond Classification: Mathematical Interaction Model}
     \centering
     \vspace{0.3em}
 
-    {\small Adapted the discrete directional \textbf{mathematical model} from wheelchair control\\
-    to filter spatial noise and enable robust, low-energy puzzle swiping.}
+    {\small 99.8\% accuracy $\neq$ usable control. Hand jitter $\to$ erratic cursor. Transient errors $\to$ dropped tiles.\\
+    \textbf{Solution:} Adapt the directional threshold model from Huda et al. 2025 (wheelchair control).}
 
-    \vspace{0.8em}
+    \vspace{0.6em}
     \begin{columns}[c]
-    \begin{column}{0.48\textwidth}
+    \begin{column}{0.45\textwidth}
         \centering
         \begin{tikzpicture}[
-            box/.style={draw=none, fill=gray!10, rounded corners, minimum width=2.8cm, minimum height=2.8cm},
             tol/.style={draw=accent, thick, dashed, fill=accent!10},
             axis/.style={-latex, thick, gray},
             move/.style={-latex, very thick, primary},
         ]
-            \node[box] (bg) at (0,0) {};
+            % Background grid hint
+            \draw[gray!20, step=0.6] (-1.8,-1.8) grid (1.8,1.8);
             
             % Tolerance zone
-            \draw[tol] (-0.8, -1.2) rectangle (0.8, 1.2);
-            \node[accent, font=\scriptsize] at (0, 0.9) {tol = 0.3w};
+            \draw[tol] (-0.9, -1.5) rectangle (0.9, 1.5);
+            \node[accent, font=\scriptsize] at (0, 1.2) {$tol = 0.3w$};
             
             % Axes
-            \draw[axis] (-1.5, 0) -- (1.5, 0) node[right] {$x$};
-            \draw[axis] (0, -1.5) -- (0, 1.5) node[above] {$y$};
+            \draw[axis] (-1.8, 0) -- (1.8, 0) node[right, font=\small] {$x$};
+            \draw[axis] (0, -1.8) -- (0, 1.8) node[above, font=\small] {$y$};
             
             % Initial point
-            \fill (0,0) circle (3pt) node[below right, font=\footnotesize] {$(x_{init}, y_{init})$};
+            \fill (0,0) circle (3pt) node[below left, font=\footnotesize] {$(x_{init}, y_{init})$};
             
-            % Movement arrows
-            \draw[move] (0,0) -- (1.2, 0) node[midway, below, font=\scriptsize] {$mov_x$};
-            \fill[primary] (1.3, 0.2) circle (2pt) node[above=1pt, font=\scriptsize] {$(x_{cur}, y_{cur})$};
+            % Movement threshold arrows
+            \draw[move] (0,0) -- (1.4, 0);
+            \node[primary, font=\scriptsize, below] at (0.7, 0) {$mov_x$};
+            
+            % Current position
+            \fill[primary] (1.5, 0.25) circle (2.5pt) node[above right, font=\scriptsize] {$(x_{cur}, y_{cur})$};
+            
+            % Label: Swipe Right
+            \node[primary, font=\small\bfseries] at (1.5, -1.0) {Swap $\to$};
         \end{tikzpicture}
+        
+        \vspace{0.3em}
+        {\scriptsize Huda et al.: wheelchair direction.\\Ours: puzzle tile swap.}
     \end{column}
-    \begin{column}{0.48\textwidth}
+    \begin{column}{0.5\textwidth}
         \small
-        \textbf{Logical Conditions}:\\ Let $\Delta x = x_{cur} - x_{init}$, $\Delta y = y_{cur} - y_{init}$
+        Let $\Delta x = x_{cur} - x_{init}$,\enspace $\Delta y = y_{cur} - y_{init}$
         
-        \vspace{0.6em}
-        \textbf{Swipe Right (swap $\to$):} \\
-        $\Delta x > \mathbf{mov_x} \text{ AND } |\Delta y| < \mathbf{tol}$
+        \vspace{0.5em}
+        \begin{tabular}{ll}
+        \toprule
+        \textbf{Action} & \textbf{Condition} \\
+        \midrule
+        Swap $\to$ & $\Delta x > mov_x$ \textbf{AND} $|\Delta y| < tol$ \\
+        Swap $\leftarrow$ & $\Delta x < -mov_x$ \textbf{AND} $|\Delta y| < tol$ \\
+        Swap $\uparrow$ & $\Delta y < -mov_y$ \textbf{AND} $|\Delta x| < tol$ \\
+        Swap $\downarrow$ & $\Delta y > mov_y$ \textbf{AND} $|\Delta x| < tol$ \\
+        \bottomrule
+        \end{tabular}
         
-        \vspace{0.6em}
-        \textbf{Swipe Up (swap $\uparrow$):} \\
-        $\Delta y < -\mathbf{mov_y} \text{ AND } |\Delta x| < \mathbf{tol}$
-        
-        \vspace{0.6em}
-        \textit{\footnotesize *Origin updates dynamically after swap for continuous multi-step swiping.}
+        \vspace{0.8em}
+        {\footnotesize
+        $mov_{x,y} = 0.6 \times \text{tile\_size}$\\
+        $tol = 0.3 \times \text{tile\_size}$\\[0.3em]
+        Origin resets after each swap\\$\to$ continuous multi-step swiping.}
     \end{column}
     \end{columns}
 \end{frame}
 
 
-% ======== 7. CONCLUSION ========
-\begin{frame}{Conclusion}
-    \centering
-    \vspace{2em}
+% ======== 7. CONCLUSION & LIMITATIONS ========
+\begin{frame}{Conclusion \& Limitations}
+    \vspace{0.5em}
 
     \begin{columns}[T]
     \begin{column}{0.55\textwidth}
-        {\large\textbf{Answers to Research Questions:}}
+        \textbf{Contributions:}
+        \begin{enumerate}
+            \setlength\itemsep{0.8em}
+            \item \textbf{Multi-modal investigation:} Both skeleton (MLP, 99.8\%) and appearance (CNN, 100\%) independently saturate accuracy for 5 coarse gestures. Fusion adds no benefit --- a \textbf{ceiling effect} driven by task simplicity.
 
-        \vspace{1em}
-        \begin{itemize}
-            \setlength\itemsep{1.2em}
-            \item \textbf{Q1 (Simplest Model):} The \textbf{227 KB MLP} on geometric skeleton data is the ultimate lightweight winner.
-            \item \textbf{Q2 (HCI Bridge):} Explicit mathematical modeling (thresholds, tolerance zones) is essential to bridge ML probabilities into \textbf{reliable human-computer interaction}.
-        \end{itemize}
+            \item \textbf{Mathematical interaction model:} Adapted from Huda et al. 2025 (wheelchair $\to$ puzzle) using $mov_x$, $mov_y$, $tol$ thresholds + 3-frame debounce + adaptive cursor.
+
+            \item \textbf{Client-side deployment:} 227~KB MLP, 30+ FPS, zero server dependency.
+        \end{enumerate}
     \end{column}
-    \begin{column}{0.4\textwidth}
-        \centering
-        \begin{block}{The Deployed System}
-            \centering
-            \textbf{MLP (227 KB)} \\
-            +\\
-            \textbf{Grid-Swipe tracker}\\
-            \vspace{0.8em}
-            {\small Runs entirely client-side\\ at 30+ FPS in any browser.}
-        \end{block}
+    \begin{column}{0.42\textwidth}
+        \textbf{Limitations:}
+        \begin{itemize}
+            \setlength\itemsep{0.6em}
+            \item 5 gestures are \textbf{trivially separable} --- fusion benefit expected at 18+ classes
+            \item Interaction model parameters ($mov$, $tol$) are \textbf{fixed}, not user-calibrated
+            \item No formal \textbf{user study} on task completion rate
+        \end{itemize}
+
+        \vspace{0.8em}
+        \textbf{Future:}
+        \begin{itemize}
+            \item Extend to full HaGRID (18 classes)
+            \item Per-user threshold calibration
+            \item Formal usability study
+        \end{itemize}
     \end{column}
     \end{columns}
 \end{frame}
@@ -307,6 +338,116 @@
     \vspace{2em}
     {\small Hieu Dinh $\cdot$ Nhat Anh $\cdot$ Quoc Anh}
     \vfill
+\end{frame}
+
+
+% ================================================================
+% BACKUP SLIDES (for Q\&A)
+% ================================================================
+\appendix
+
+\begin{frame}[noframenumbering]{Backup: Confusion Matrices}
+\begin{columns}[c]
+\begin{column}{0.48\textwidth}
+    \centering
+    {\textbf{Random Forest (94\%)}}\\[0.3em]
+    \includegraphics[width=\textwidth]{rf_confusion_matrix.png}
+    {\small Frame $\leftrightarrow$ None confusion}
+\end{column}
+\begin{column}{0.48\textwidth}
+    \centering
+    {\textbf{MLP (99.8\%)}}\\[0.3em]
+    \includegraphics[width=\textwidth]{mlp_confusion_matrix.png}
+    {\small Full 60D resolves it}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}[noframenumbering]{Backup: YOLO Detection Results}
+    \centering
+    \vspace{1em}
+    
+    \textbf{YOLOv8n} --- simultaneous detection + classification
+    
+    \vspace{1em}
+    \begin{tabular}{lr}
+    \toprule
+    \textbf{Metric} & \textbf{Score} \\
+    \midrule
+    mAP@50 & 99.5\% \\
+    mAP@50:95 & 90.7\% \\
+    Parameters & 3.0M \\
+    Model size & 6.2 MB \\
+    \bottomrule
+    \end{tabular}
+    
+    \vspace{1.5em}
+    {\small Different task than classification (includes localization).\\
+    Useful when hand bounding box is unknown at inference.\\
+    \textbf{But:} 20$\times$ larger than MLP --- overkill when MediaPipe provides landmarks.}
+\end{frame}
+
+\begin{frame}[noframenumbering]{Backup: SOTA Context}
+    \centering
+    \vspace{1em}
+    
+    \textbf{HaGRID baselines} (full 18-class set, 554K images):
+    
+    \vspace{0.8em}
+    \begin{tabular}{llr}
+    \toprule
+    \textbf{Method} & \textbf{Params} & \textbf{F1} \\
+    \midrule
+    SSDLite+MobileNetV3-S & --- & 57.7 \\
+    SSDLite+MobileNetV3-L & --- & 71.6 \\
+    ResNet-18 & 11M & 89.6 \\
+    ResNeXt-101 & 44M & 87.0 \\
+    ResNet-152 & 60M & 95.5 \\
+    \midrule
+    \textbf{Ours: MLP on 5 classes} & \textbf{14.7K} & \textbf{99.8} \\
+    \bottomrule
+    \end{tabular}
+    
+    \vspace{1em}
+    {\small Not directly comparable (5 vs 18 classes), but shows:\\a tiny MLP saturates a simple subset of the same dataset.}
+\end{frame}
+
+\begin{frame}[noframenumbering]{Backup: Frame Gesture \& Deployment Differences}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+    \textbf{Benchmarking vs.\ Deployed System}
+
+    \vspace{0.5em}
+    \begin{tabular}{lll}
+    \toprule
+    \textbf{Aspect} & \textbf{Benchmark} & \textbf{Deployed} \\
+    \midrule
+    Classifier & MLP (5-class) & MLP (4-class) \\
+    Frame detect & MLP & 2-hand heuristic \\
+    CNN & Evaluated & Optional \\
+    Fusion & Evaluated & Not used \\
+    \bottomrule
+    \end{tabular}
+
+    \vspace{0.8em}
+    {\small The 99.8\% accuracy is from the 5-class MLP in the benchmarking study. The deployed system uses a simpler, more robust configuration.}
+\end{column}
+\begin{column}{0.48\textwidth}
+    \textbf{Why bypass MLP for ``frame''?}
+
+    \vspace{0.5em}
+    \begin{itemize}
+        \setlength\itemsep{0.5em}
+        \item ``Frame'' = two hands forming rectangle
+        \item MediaPipe reliably detects 2 hands
+        \item Two-hand presence is the \textbf{defining property} of the gesture
+        \item More robust than classifying from a single-hand crop
+    \end{itemize}
+
+    \vspace{0.5em}
+    {\small This is a practical deployment optimization, not a limitation of the classifier.}
+\end{column}
+\end{columns}
 \end{frame}
 
 \end{document}
