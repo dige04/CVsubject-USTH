@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "f26c01a64be6",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "game/game.js",
+    "game/index.html",
+    "game/main.js",
+    "game/style.css"
+  ],
+  "sessions": [
+    {
+      "metadata": "/f2/6c01a64be6/0/metadata.json",
+      "transcript": "/f2/6c01a64be6/0/full.jsonl",
+      "context": "/f2/6c01a64be6/0/context.md",
+      "content_hash": "/f2/6c01a64be6/0/content_hash.txt",
+      "prompt": "/f2/6c01a64be6/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 4712286,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 522,
+    "api_call_count": 44
+  }
+}
