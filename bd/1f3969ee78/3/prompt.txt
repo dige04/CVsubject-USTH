@@ -1,0 +1,1688 @@
+hi
+
+---
+
+Gọi team vào review project có theo sát chủ đề Vision-First Multi-Modal Approach for Hand Gesture Recognition  không? Và có clear về đề tài trình bày môn computer vision trong 15 phút không
+
+---
+
+'/Users/hieudinh/Documents/my-projects/CVsubject/outputs/report.tex''/Users/hieudinh/Documents/my-projects/CVsubject/outputs/presentation.tex'\
+actually all is here, but call agents team to debate honestly, I need a professor about CV agent, just need clearly problem statement and curious about SOTA
+
+---
+
+Vậy giờ nên làm lại như nào nhỉ, Tôi nghĩ cần ngắn gọn, nhưng học thuật hơn, clear hơn
+
+---
+
+sao tôi có cảm giác bài này không đủ cạnh tranh
+
+---
+
+Thay vì cố nói project hiện tại là A Vision-First Multi-Modal Approach for Hand Gesture Recognition chúng ta có thể improve nó trơ nên như vậy được không? https://www.mdpi.com/2313-433X/8/6/153
+https://www.researchgate.net/publication/391109800_Developing_a_real-time_hand-gesture_recognition_technique_for_wheelchair_control
+https://www.mdpi.com/2079-9292/14/4/734
+
+---
+
+[Request interrupted by user for tool use]
+
+---
+
+@papers/ đọc và thử brainstorm lại phát
+
+---
+
+[Request interrupted by user]
+
+---
+
+Thay vì cố nói project hiện tại là A Vision-First Multi-Modal Approach for Hand Gesture Recognition chúng ta có thể improve nó trơ nên như vậy được không? https://www.mdpi.com/2313-433X/8/6/153
+https://www.researchgate.net/publication/391109800_Developing_a_real-time_hand-gesture_recognition_technique_for_wheelchair_control
+https://www.mdpi.com/2079-9292/14/4/734\
+tôi đã tải về tại @papers /brainstorm
+
+---
+
+You are a Solution Brainstormer, an elite software engineering expert who specializes in system architecture design and technical decision-making. Your core mission is to collaborate with users to find the best possible solutions while maintaining brutal honesty about feasibility and trade-offs.
+
+## Answer this question: 
+<question>The user has a CV course project on hand gesture recognition that needs to be more competitive/academic. They have 3 reference papers at /Users/hieudinh/Documents/my-projects/CVsubject/papers/ (jimaging-08-00153.pdf, Developing_a_real-time_hand-gesture_recognition_te.pdf, electronics-14-00734.pdf). Current project is at /Users/hieudinh/Documents/my-projects/CVsubject/ with report at outputs/report.tex and presentation at outputs/presentation.tex. The project currently has 6 methods (Heuristic, RF, MLP, CNN, YOLOv8n, Fusion) on 5 HaGRID classes getting 100% accuracy — the problem is the task is too easy and fusion adds nothing. The user wants to restructure the project to be more like these published papers. Key question: how to reframe or extend the project to be academically competitive for a 15-minute CV course presentation.</question>
+
+## Core Principles
+You operate by the holy trinity of software engineering: **YAGNI** (You Aren't Gonna Need It), **KISS** (Keep It Simple, Stupid), and **DRY** (Don't Repeat Yourself). Every solution you propose must honor these principles.
+
+## Your Expertise
+- System architecture design and scalability patterns
+- Risk assessment and mitigation strategies
+- Development time optimization and resource allocation
+- User Experience (UX) and Developer Experience (DX) optimization
+- Technical debt management and maintainability
+- Performance optimization and bottleneck identification
+
+## Your Approach
+1. **Question Everything**: Ask probing questions to fully understand the user's request, constraints, and true objectives. Don't assume - clarify until you're 100% certain.
+
+2. **Brutal Honesty**: Provide frank, unfiltered feedback about ideas. If something is unrealistic, over-engineered, or likely to cause problems, say so directly. Your job is to prevent costly mistakes.
+
+3. **Explore Alternatives**: Always consider multiple approaches. Present 2-3 viable solutions with clear pros/cons, explaining why one might be superior.
+
+4. **Challenge Assumptions**: Question the user's initial approach. Often the best solution is different from what was originally envisioned.
+
+5. **Consider All Stakeholders**: Evaluate impact on end users, developers, operations team, and business objectives.
+
+## Collaboration Tools
+- Consult the `planner` agent to research industry best practices and find proven solutions
+- Engage the `docs-manager` agent to understand existing project implementation and constraints
+- Use `Search Google` tool from `searchapi` MCP server to find efficient approaches and learn from others' experiences
+- Use `docs-seeker` skill to read latest documentation of external plugins/packages
+- Leverage `ai-multimodal` skill to analyze visual materials and mockups
+- Query `psql` command to understand current database structure and existing data
+- Employ `sequential-thinking` skill for complex problem-solving that requires structured analysis
+
+## Your Process
+1. **Discovery Phase**: Ask clarifying questions about requirements, constraints, timeline, and success criteria
+2. **Research Phase**: Gather information from other agents and external sources
+3. **Analysis Phase**: Evaluate multiple approaches using your expertise and principles
+4. **Debate Phase**: Present options, challenge user preferences, and work toward the optimal solution
+5. **Consensus Phase**: Ensure alignment on the chosen approach and document decisions
+6. **Documentation Phase**: Create a comprehensive markdown summary report with the final agreed solution
+
+## Output Requirements
+When brainstorming concludes with agreement, create a detailed markdown summary report including:
+- Problem statement and requirements
+- Evaluated approaches with pros/cons
+- Final recommended solution with rationale
+- Implementation considerations and risks
+- Success metrics and validation criteria
+- Next steps and dependencies
+* **IMPORTANT:** Sacrifice grammar for the sake of concision when writing outputs.
+
+## Critical Constraints
+- You DO NOT implement solutions yourself - you only brainstorm and advise
+- You must validate feasibility before endorsing any approach
+- You prioritize long-term maintainability over short-term convenience
+- You consider both technical excellence and business pragmatism
+
+**Remember:** Your role is to be the user's most trusted technical advisor - someone who will tell them hard truths to ensure they build something great, maintainable, and successful.
+
+**IMPORTANT:** **DO NOT** implement anything, just brainstorm, answer questions and advise.
+
+---
+
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+Analysis:
+Let me go through the conversation chronologically:
+
+1. User greeted with "hi", I responded with a simple greeting.
+
+2. User asked (in Vietnamese) to review the project for alignment with "Vision-First Multi-Modal Approach for Hand Gesture Recognition" topic and assess clarity for a 15-minute CV course presentation.
+
+3. I read multiple files in parallel:
+   - presentation-plan-multimodal.md (the plan with 25 slides, many TBD results)
+   - report.tex (root - the OLD report with only 3 methods)
+   - Explored the full project structure via Explore agent
+   - Read ml/cnn.py (MobileNetV3-Small CNN classifier)
+   - Read ml/fusion.py (weighted average + learned fusion head)
+   - Read outputs/presentation.tex (the ACTUAL 11-slide presentation)
+
+4. Initially I incorrectly assessed that the report wasn't updated (I read root report.tex instead of outputs/report.tex). I flagged this as a critical issue.
+
+5. User corrected me: the actual deliverables are at outputs/report.tex and outputs/presentation.tex, and asked me to "call agents team to debate honestly" focusing on problem statement clarity and SOTA comparison.
+
+6. I read outputs/report.tex - discovered it IS fully updated with all 6 methods, correct dataset (23,850 samples, 13,250 subjects), and proper "Vision-First Multi-Modal" title.
+
+7. Launched two parallel agents:
+   - brainstormer agent as "CV professor" - critically evaluated problem statement, intellectual honesty, academic rigor
+   - researcher agent - researched SOTA in hand gesture recognition
+
+8. Key findings from agents:
+   - Problem statement is structurally doomed (5 classes too easy, fusion can't improve 100%)
+   - Title "Vision-First Multi-Modal" is misleading when fusion adds nothing
+   - 100% accuracy raises red flags (potential data leakage concern with CNN single checkpoint)
+   - Learned fusion 31.8% is a data pipeline bug (443 paired samples, 140K params)
+   - SOTA gaps: no fusion literature cited, HaGRID v2 paper exists but not cited
+   - 7 tough Q&A questions identified
+
+9. I presented recommendations for reframing: change title, reframe RQ to "When does fusion help?", reframe Slide 8 as main finding about "Modality Saturation"
+
+10. User said "sao tôi có cảm giác bài này không đủ cạnh tranh" (feeling the project isn't competitive enough)
+
+11. I gave honest assessment: the project lacks a sufficiently hard problem. Proposed 3 options:
+    - Option A: Increase to 18+ classes (most impactful, needs re-run)
+    - Option B: Add noise/adversarial conditions (medium effort)
+    - Option C: Reframe only (weakest)
+
+12. User shared 3 reference papers and asked to brainstorm how to improve project to that level:
+    - jimaging-08-00153.pdf (Al Farid et al., J. Imaging 2022 - systematic review)
+    - Developing_a_real-time_hand-gesture_recognition_te.pdf (Huda et al., PLOS ONE 2025 - wheelchair control)
+    - electronics-14-00734.pdf (MDPI Electronics 2025 - YOLOv8n wheelchair)
+
+13. WebFetch failed (403) on all 3 URLs. WebSearch returned info on 2 of 3 papers. Papers are downloaded locally at /papers/.
+
+14. User said to read @papers/ and /brainstorm. I invoked the brainstorm skill.
+
+15. In the brainstorm, I read the 3 PDFs (content not fully extractable), read project files, explored ML pipeline structure, and produced a detailed brainstorm report with 3 options:
+    - Option A: Skeleton-Image Representation (novel 3rd modality)
+    - Option B: Robustness Under Degradation (test fusion value under adverse conditions)
+    - Option C: Scale to 18 Classes
+    - Recommended Option B as best balance of effort/impact/feasibility
+
+Key files examined:
+- /outputs/report.tex - the actual updated report with 6 methods
+- /outputs/presentation.tex - 11-slide Beamer presentation
+- /presentation-plan-multimodal.md - original 25-slide plan
+- /report.tex - OLD root report (only 3 methods)
+- /ml/cnn.py - MobileNetV3-Small CNN classifier with feature extraction
+- /ml/fusion.py - weighted average + learned fusion head (PyTorch)
+- /ml/preprocessing.py - landmark normalization pipeline
+- /ml/scripts/download_hagrid.py - HaGRID v2 YOLO format downloader
+- /papers/*.pdf - 3 reference papers
+
+No code was modified. This was entirely a review/brainstorming session.
+
+Summary:
+1. Primary Request and Intent:
+   The user (Vietnamese-speaking CS student) requested a comprehensive review of their CV course project "Vision-First Multi-Modal Approach for Hand Gesture Recognition" to assess:
+   - Whether it follows the stated topic
+   - Whether it's clear enough for a 15-minute presentation
+   - How to make it more academically competitive
+   
+   The user progressively refined their intent from "review" → "honest debate from professor perspective" → "feeling it's not competitive enough" → "how to improve it to the level of published papers" (providing 3 reference papers). The user invoked `/brainstorm` for the final analysis.
+
+2. Key Technical Concepts:
+   - **6 classification methods compared**: Heuristic (0.99%), Random Forest (94.13%), MLP (99.8%), CNN/MobileNetV3-Small (100.0%), YOLOv8n (99.5% mAP@50), Weighted Average Fusion (100.0%)
+   - **Person-aware Group 5-Fold Cross-Validation** using subject IDs as groups (GroupKFold)
+   - **HaGRID v2 dataset**: 23,850 samples, 13,250 subjects, 5 gesture classes (open_hand, fist, pinch, frame, none)
+   - **Dual-stream architecture**: Skeleton (MediaPipe 60D landmarks → MLP) + Appearance (224×224 crops → MobileNetV3-Small CNN) → Late Fusion
+   - **Ceiling effect / modality saturation**: Both modalities independently achieve near-perfect accuracy on 5 visually distinct classes, making fusion redundant
+   - **Learned fusion failure**: 31.8% accuracy with only 443 paired samples (data pipeline mismatch, not a fusion finding)
+   - **ONNX browser deployment**: Client-side inference via ONNX Runtime Web
+   - **Reference paper approaches**: Dynamic threshold heuristic (wheelchair), Skeleton-image representation (MediaPipe→white lines on black→YOLO), Systematic review (108 papers)
+
+3. Files and Code Sections:
+   - **`/outputs/report.tex`** (the ACTUAL current report)
+     - Fully updated with all 6 methods, correct dataset stats (23,850 samples, 13,250 subjects)
+     - Title: "A Vision-First Multi-Modal Approach for Hand Gesture Recognition"
+     - Contains proper dual-stream pipeline diagram, CNN fold details, fusion methodology
+     - Key issue: research question is untestable because classes are too easy
+   
+   - **`/outputs/presentation.tex`** (11-slide Beamer presentation)
+     - Title matches report; 11 slides for 15 min (~80s/slide)
+     - Slide 8 "Why 100%? Honest Answer" — self-critical but defensively framed
+     - Results table: Heuristic 0.99%, RF 94.1%, MLP 99.8%, CNN 100.0%, Fusion 100.0%, YOLO 99.5% mAP@50
+     - Backup slide: SOTA comparison (their 5-class vs HaGRID 18-class baselines — flagged as misleading)
+   
+   - **`/report.tex`** (ROOT — OLD report, only 3 methods)
+     - Contains only Heuristic, RF, MLP with old dataset (9,231 samples, 3,607 subjects)
+     - NOT the current deliverable — caused initial confusion
+   
+   - **`/presentation-plan-multimodal.md`** (original 25-slide plan)
+     - Many [TBD] results; outdated relative to actual presentation
+     - Pre-presentation checklist with unchecked items
+   
+   - **`/ml/cnn.py`** — MobileNetV3-Small with ImageNet pretrain
+     - `build_model()`: freezes first 8 feature blocks, replaces classifier head
+     - `CNNFeatureExtractor`: strips final Linear, outputs 1024-dim features for fusion
+     - `train_cnn()`: Adam + CosineAnnealingLR, best-model tracking
+     - `export_cnn_onnx()`: ONNX export with dynamic batch axes
+   
+   - **`/ml/fusion.py`** — Two fusion strategies
+     - `weighted_average_fusion()`: α × MLP_softmax + (1-α) × CNN_softmax
+     - `tune_alpha()`: grid search α ∈ [0.1, 1.0) step 0.05
+     - `FusionHead` (PyTorch): [64-dim MLP ; 1024-dim CNN] → Dense(128) → ReLU → Dropout(0.3) → Dense(5)
+     - `train_fusion_head()`: early stopping, patience=10
+     - `get_mlp_feature_extractor()`: extracts Dense(64) layer output from Keras MLP
+   
+   - **`/ml/preprocessing.py`** — Landmark normalization
+     - `GESTURE_CLASSES = ["open_hand", "fist", "pinch", "frame", "none"]` — hardcoded 5 classes
+     - Wrist-relative translation + scale normalization → 60D vector
+   
+   - **`/ml/scripts/download_hagrid.py`** — Downloads all 34 HaGRID classes from HuggingFace
+     - Supports full dataset; class filtering happens downstream
+   
+   - **`/papers/`** — 3 reference papers (PDFs downloaded locally):
+     - `jimaging-08-00153.pdf`: Al Farid et al., J. Imaging 2022 — systematic review, 108 papers, avg 86.6% accuracy
+     - `Developing_a_real-time_hand-gesture_recognition_te.pdf`: Huda et al., PLOS ONE 2025 — wheelchair control, dynamic thresholds, 98.14%, 7 gestures
+     - `electronics-14-00734.pdf`: MDPI Electronics 2025 — skeleton-image representation (MediaPipe→white lines on black→YOLOv8n), 99.3%, Jetson Nano
+
+4. Errors and Fixes:
+   - **Initial misidentification of report**: Read `/report.tex` (old, 3 methods) instead of `/outputs/report.tex` (current, 6 methods). User corrected: "actually all is here" pointing to outputs/ directory. Fixed by reading the correct file.
+   - **WebFetch 403 errors**: All 3 paper URLs (MDPI, ResearchGate) returned 403. Used WebSearch as fallback; got info on 2 of 3 papers. User had already downloaded PDFs locally to `/papers/`.
+   - **PDF content extraction**: Read tool returned file size but no visible text content for the 3 PDFs. Worked around using search results and prior conversation context.
+   - **Explore agent API error 499**: Agent cancelled. Fell back to Glob + Read for ML pipeline exploration.
+
+5. Problem Solving:
+   - **Identified core academic weakness**: The research question ("does fusion improve accuracy?") is untestable with 5 classes that are too easy (ceiling effect)
+   - **Identified SOTA gaps**: No fusion literature cited (Neverova 2015, Simonyan 2014), HaGRID v2 paper not cited, weighted average classified as "naive" in literature
+   - **Identified methodology concerns**: CNN may use single checkpoint across all folds (data leakage risk), learned fusion failure is pipeline bug not finding
+   - **Proposed reframing**: Change RQ to "When does multi-modal fusion help?" to turn negative result into boundary condition finding
+   - **Brainstormed 3 improvement options**: (A) Skeleton-image representation as 3rd modality, (B) Robustness under degradation testing, (C) Scale to 18+ classes
+   - **Recommended Option B** (Robustness) as best effort/impact ratio — no retraining needed, just add degraded test sets
+
+6. All User Messages:
+   - "hi"
+   - "Gọi team vào review project có theo sát chủ đề Vision-First Multi-Modal Approach for Hand Gesture Recognition không? Và có clear về đề tài trình bày môn computer vision trong 15 phút không"
+   - "actually all is here, but call agents team to debate honestly, I need a professor about CV agent, just need clearly problem statement and curious about SOTA" (pointing to outputs/report.tex and outputs/presentation.tex)
+   - "Vậy giờ nên làm lại như nào nhỉ, Tôi nghĩ cần ngắn gọn, nhưng học thuật hơn, clear hơn" (how to redo it — more concise, more academic, clearer)
+   - "sao tôi có cảm giác bài này không đủ cạnh tranh" (feeling the project isn't competitive enough)
+   - "Thay vì cố nói project hiện tại là A Vision-First Multi-Modal Approach for Hand Gesture Recognition chúng ta có thể improve nó trơ nên như vậy được không?" + 3 paper URLs + "tôi đã tải về tại @papers /brainstorm"
+
+7. Pending Tasks:
+   - User has NOT yet chosen between the 3 brainstormed options (A: skeleton-image, B: robustness, C: 18 classes)
+   - No code has been modified yet — entire session was review/brainstorming
+   - Report and presentation need rewriting once direction is chosen
+   - The brainstorm ended with "Want me to go deeper on any option?"
+
+8. Current Work:
+   The brainstorm skill just completed with a detailed report presenting 3 options to make the project more academically competitive, inspired by the 3 reference papers. The recommendation was Option B (Robustness Under Degradation) as the best balance. The brainstorm output included:
+   - Analysis of what makes the 3 reference papers publishable vs the current project
+   - 3 concrete improvement paths with feasibility assessment
+   - Proposed degradation test matrix (blur, low light, occlusion, landmark noise, combined)
+   - Proposed presentation restructuring for each option
+   
+   The user has not yet responded to the brainstorm output.
+
+9. Optional Next Step:
+   Wait for user to choose between Option A (skeleton-image representation), Option B (robustness under degradation), or Option C (scale to 18 classes). The brainstorm concluded with: "Want me to go deeper on any option?" Once user decides, the next step would be implementing the chosen direction — either creating degradation evaluation code (Option B), a skeleton renderer (Option A), or modifying class configuration (Option C), followed by updating outputs/report.tex and outputs/presentation.tex.
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/hieudinh/.REDACTED.jsonl
+
+---
+
+You are a Solution Brainstormer, an elite software engineering expert who specializes in system architecture design and technical decision-making. Your core mission is to collaborate with users to find the best possible solutions while maintaining brutal honesty about feasibility and trade-offs.
+
+## Answer this question: 
+<question>có thể cân nhắc xoá bỏ 1 số phần, để phần trình bày được ngắn gọn súc tích, tập trung hơn. Hãy tham khảo thêm về paper 1 lần nữa
+RESEARCH ARTICLE
+Developing a real-time hand-gesture
+recognition technique for wheelchair control
+Md Rafiul Huda, Md. Liakot Ali *, Muhammad Sheikh Sadi
+Institute of Information and Communication Technology (IICT), Bangladesh University of Engineering and
+Technology (BUET), Dhaka, Bangladesh
+* liakot@iict.buet.ac.bd
+Abstract
+At present, significant number of people in the world are having motor disabilities. They
+need to use wheelchair for performing regular movements and activities. However, there
+are a lot of issues and challenges in using the conventional wheelchairs. Safe navigation,
+independent mobility and low cost are the key issues for wheelchair users. This paper
+presents a new mathematical model for an efficient and real-time hand gesture recognition
+technique for a smart wheelchair control system, in line with contemporary technologies.
+The model is developed using the positions of the significant hand landmarks, distances
+among them and some critical thresholds which are determined by good number of
+samples of hands. The proposed method offers more users’ flexibility through less hand
+movement in operation of the wheelchair. The model is tested for hands of different sizes,
+irrespective of any background in indoor or outdoor under sunlight. The experimental study
+demonstrates that it outperforms the existing methods in terms of success rate with good
+performance metrics.
+OPEN ACCESS
+Citation: Ali ML, Huda MR, Sadi MS (2025)
+Developing a real-time hand-gesture
+recognition technique for wheelchair control.
+PLoS One 20(4): e0319996. https://doi.
+org/10.1371/journal.pone.0319996
+Editor: Laura Morett, University of Missouri
+Columbia, UNITED STATES OF AMERICA
+Received: March 17, 2024
+Accepted: February 10, 2025
+Published: April 24, 2025
+Peer Review History: PLOS recognizes the
+benefits of transparency in the peer review
+process; therefore, we enable the publication
+of all of the content of peer review and
+author responses alongside final, published
+articles. The editorial history of this article is
+available here: https://doi.org/10.1371/journal.
+pone.0319996
+Copyright: © 2025 Huda et al. This is an open
+access article distributed under the terms of
+the Creative Commons Attribution License,
+which permits unrestricted use, distribution,
+and reproduction in any medium, provided the
+original author and source are credited.
+Data availability statement: In this work, no
+separate data set was used or required for any
+1. Introduction
+One of the most important desire of human life is his/her free and independent mobility.
+Every human life deserves the right to move around freely. According to the World Health
+Organization (WHO), approximately 15% of the world’s population has a disability with
+problems in their body’s structure or function or face difficulties in performing action in daily
+life [1]. Out of these numbers, 131.8 million people due to their diseases or disabilities like
+hemiplegia, quadriplegia, paraplegia, brain injury, cerebral palsy [2], broken leg, and more
+(or 1.85% of the global population) require a wheelchair to go around daily [3]. It is among
+the most widely used assistive technologies that gives support for independent navigation
+to the people with disabilities and its demand is raised to make their life easier [4]. Manual
+wheelchairs are fulfilling the necessity for many years. But it is very difficult for the people
+with severe disabilities to run a wheelchair manually by their own. Hence, they require human
+assistance for safe navigation with wheelchair. Also, the long-time use of manual wheelchair
+may affect the user’s health and muscles [5]. So powered wheelchair is developed to mitigate
+these problems [6]. In this era of ICT, an electronic system can be integrated to a wheelchair
+to make it smarter and more intelligent. The vast majority of developed systems use technol-
+ogies like Artificial Intelligence (AI), the Human-Machine Interface (HMI), Brain-Computer
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 1 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+training or testing, as a mathematical model
+is developed and gesture recognition is done
+live based on that mathematical model. For the
+hand detection part only, MediaPipe framework
+is used, which contains a pre-trained hand
+landmark model that employs direct coordinate
+prediction or regression to precisely locate 21
+3D coordinates representing hand knuckles.
+Then, for gesture recognition, a mathematical
+model is developed using distances among
+hand landmarks and some thresholds, which
+is the major part of the proposed methodology
+and requires no data set. In this part, contin-
+uous measurement of distances among hand
+landmarks on actual live hand is performed.
+Upon satisfying the different logical conditions
+as mentioned in the manuscript, different
+gestures are recognized and relevant wheel-
+chair operations are performed. Accuracy was
+measured from outputs by capturing such live
+hand samples multiple times for each gesture
+accordingly. However, extracted data and
+outputs from scanned image have been added
+in supporting information files.
+Funding: The author(s) received no specific
+funding for this work.
+Competing interests: The authors have
+declared that no competing interests exist.
+Interface (BCI) [7], Motion Sensors, and Computer Vision [8-9]. But, in order to make the
+wheelchair more suitable for disabled people specially who have low energy and lower control
+of hands, it needs to be more user-flexible and easily controllable. Also, the cost should be
+minimized at the same time to make it accessible to greater range of population.
+Gestures are an easy yet powerful means to express emotions and interact with others.
+Touch, joystick control, movement, and other methods of physical contact are additional
+forms of communication. In order to use things like contemporary smartphones, physical
+contact is required. Joystick operations generally require more energy and more movements
+of hands and fingers. But, a significant percentage of the population is incapable to engage in
+physical activity and does not possess the strength necessary to operate a typical joystick. Ges-
+ture is an easier way to perform wheelchair operations for disabled people who face difficulties
+in moving their hands properly. Consequently, gesture communication is a practical tech-
+nique that is currently receiving greater attention [10]. Gestures can easily be integrated into
+advanced wheelchair functionalities, making wheelchairs easier to control, through the use of
+computer vision, camera, and AI-based technologies like deep machine learning [11].
+Several researches have been performed utilizing the gestures by various organs, i.e., hand
+gestures, head movements and eye gaze. Recent innovations in this field include depth cam-
+eras such as Microsoft’s Kinect [12] and gesture recognition models with such depth cameras
+have been developed by a number of researchers [13-14]. But these cameras are more expen-
+sive than the typical RGB camera and the accuracy varies with background complexity [19].
+Additionally, using an RGB camera to achieve better results can be challenging due to the
+lightning of the environment. Consequently, it is challenging in this industry to recognize ges-
+tures using RGB camera and inexpensive equipment. Another researcher has designed a hand
+gesture recognition model utilizing Haar-cascade classifier [15], skin segmentation [16] and
+2D CNN. However, this model doesn’t perform well at outdoor under daylight or if any part
+of the background coincides with the skin color of the hand. Hence, it is still now a challeng-
+ing issue to build an efficient gesture recognition technique for wheelchair control that will
+consider users’ flexibility, high accuracy, and environment independency.
+In this paper, we have proposed a unique mathematical approach for hand gesture rec-
+ognition in real-time for the control of a smart wheelchair using only finger movement in
+front of an RGB camera. The user will be able to control the wheelchair by simple natural
+movements of fingers comfortably. The entire process is divided into three main steps: Hand
+detection and hand tracking using MediaPipe Hands [17], hand landmarks extraction, and
+gestures recognition using a unique mathematical model. The proposed model is distinc-
+tive in that it compares the distances between key hand landmarks to certain thresholds that
+are determined earlier using the locations of the major hand landmarks and the minimum,
+maximum, and average normalized distances among the major landmarks in real time. Some
+important thresholds have been determined and some logical conditions have been developed
+to recognize different gestures. After these logical conditions have been satisfied, different
+control operations are performed based on different gestures. In contrast to the conventional
+joystick control technique, the proposed technique will allow a smart wheelchair system to be
+easily operated by disabled people by using only natural finger gestures and movements which
+makes it more flexible and easily controllable. It requires less energy and effort of the users.
+The proposed technique utilizes a simple RGB camera (1 Mega Pixel, 30 FPS, and USB cable
+connection) to detect and recognize gestures and movements and no joystick operations or
+separate sensors are required.
+The three gestures which are taken into consideration in this research stand in for three
+modes of wheelchair operation: ‘Drive’, ‘Stop’ and ‘Horn’. When in driving mode, a specific
+finger is tracked and wheelchair’s directional movement is performed accordingly as per the
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 2 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+direction of that finger. The wheelchair’s movement is stopped using the ‘Stop’ mode, and any
+obstacles are alerted to using the Horn mode.
+Contributions of this research are -
+•
+A unique mathematical model has been designed utilizing hand landmarks and some
+thresholds for hand gesture recognition
+•
+An efficient, flexible gesture recognition system for the control of a wheelchair has been
+proposed which requires only movement of fingers
+•
+A better gesture recognition system for wheelchair control has been proposed focusing these
+aspects all together: users’ flexibility, high accuracy, and environment (indoor and outdoor)
+independency.
+The rest of the paper is summarized as follows. Section 2 represents a study of related
+works which are developed by various researchers. After that, Section 3 elaborates the pro-
+posed technique of whole gesture recognition process used in this research. Section 4 provides
+a detailed analysis of the experiment performed using the proposed technique, including
+comparison with other similar developed systems. Section 5 concludes the paper.
+2. Related work
+The features of smart wheelchairs are continuously being improved by researchers and devel-
+opers. Over the past few years, a number of smart wheelchair systems with various control
+mechanisms have been proposed. We have discussed a few of these techniques as they pertain
+to the suggested system for consistency’s sake.
+For instance, a Bluetooth-based recognition system using hand or finger movements was
+presented by Megalingam et al. [18] using an android application running on an intelligent
+device. The user must navigate the touchscreen of the system with their hands or fingers. The
+tablet display must be bigger so that the entire palm fits on the tablet. However, it might be
+challenging for those who are unable to use that particular system.
+An intelligent wheelchair system that is controlled by hand gestures was suggested by Gao
+et al. [19]. Real-time gesture tracking is accomplished using a powerful laptop and the Kinect
+depth camera. It acquires the input signal based on the gesture. Since the user needs to raise
+his/her hands to perform gestures, the proposed system is not always user-friendly for the
+disabled or elderly people who cannot move their hands properly. Depth cameras are also
+expensive compared to simple RGB camera.
+Another wheelchair control system utilizing the iris movement was created by Desai et al.
+[20], allowing the wheelchair user to control the wheelchair by moving their eye’s iris. MAT-
+LAB programming embedded within this system was used to implement it. For detecting eye
+movements, a HD camera was used with the main idea being to transmit the images of the eye
+to the embedded system. Circular Hough Transform (CHT) algorithm was considered for the
+eye detection is the which aims to recognize circular patterns. However, this proposed system
+causes complications in real-time.
+Oliver et al. [21] devised a method to operate powered wheelchairs by using a gesture-controlled
+joystick manipulator. The proposed joystick manipulator utilized a body-mounted
+accelerometer, used for gesture control through motion detection. The detected movements
+made by the user are then processed by the Arduino microprocessor mounted in the control
+unit of the joystick. The joystick control unit then mechanically manipulates the powered
+wheelchairs installed two-axis proportional joystick with two servo motors, maneuver-
+ing the powered chair in the desired direction. For users with dexterity issues, wearing an
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 3 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+accelerometer band and performing gestures with hand movement may not be suitable
+always.
+Kutbi et al. [22] have suggested a head movement tracking-based wheelchair con-
+trol model. In this work, the user’s head-motion is detected through a head-mounted,
+­ outward-facing egocentric camera. The wheelchair was modeled using the TI-TAN18CS,
+the command processor was an Arduino Mega, and the framework was Robot OS (ROS).
+Head-motion is estimated from the difference of the pose of the head relative to the wheel-
+chair frame in two consecutive frames. The system’s performance was around 85.7%. The
+system’s price is still high, and using a head-mounted egocentric camera is not user-friendly.
+Mahmud et al. [23] have created a multi-modal wheelchair control mechanism. This sys-
+tem utilized a raspberry pi, an RGB camera, a modified VGG-8 model, and an accelerometer
+for tracking head movement, hands, and eye gaze, respectively. The performance success rate
+varies around 90%. The two drawbacks are that the eye gaze detection mechanisms are not
+user-friendly and that tracking sensors must be attached to the user’s body.
+Tejonidhi et al. [24] have proposed an eye-pupil tracking-based wheelchair movement
+system. For the purpose of identifying the eyeballs in RGB photographs, this system utilized
+a Philips microcontroller and the Viola-Jones MATLAB algorithm. The performance varies
+from 70% to 90%, and the detection procedure is crucial for real-time applications. As a result,
+it cannot be used in a real-world situation.
+Sadi et al. [25] designed a wheelchair system which is controlled by hand gestures in real
+time, where the authors used YCrCb skin segmentation technique, Haar-cascade classifier,
+KCF tracking algorithm, and a 2D CNN model. The proposed 2D CNN model contains three
+convolutional and three max-pooling layers. However, this system is not very reliable and
+doesn’t perform well under bright light or when the color of the background beneath the hand
+and the skin tone becomes similar.
+An overview of associated works with their major attributes is presented in Table 1.
+3. Proposed technique and its implementation
+The proposed gesture recognition technique has been developed considering the highest
+user flexibility for disabled persons so that wheelchair can be controlled by using minimum
+movements of hand or fingers. Also, the limitations of related work are also kept in mind
+during designing the methodology. The proposed gesture recognition technique has three
+fundamental steps: hand detection and tracking, hand landmarks extraction, and the recogni-
+tion of hand gestures using an effective mathematical model, as shown in Fig 1. The math-
+ematical model will be used for gesture recognition by developing some logical conditions
+and then different control operations will be performed as per different gestures. It has been
+created using some crucial calculations and logical conditions. The model was created using
+the distances between the major hand landmarks and a few threshold values. These thresholds
+are determined at the beginning of gesture recognition for once from a number of real hand
+samples. The buildings blocks are discussed in detail in this paper.
+3.1. Hand detection and hand tracking
+The term ‘Hand detection’ refers to the identification of the hand area within the frame of an
+image. This is the primary step in recognizing hand movements. During this stage, a low-cost
+RGB camera is used to capture the image of the user’s hand from top position. To create the
+scenario of the wheelchair, hand is kept on a handle and the RGB camera is placed on top
+of the hand. Then hand is detected and its motion is tracked accordingly. Tracking involves
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 4 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+Table 1. An overview of related work.
+Existing
+Technique
+Functionality Limitations Major Equipment Accuracy
+Gao et al [19]. Hand gesture
+recognition
+Requires hand raising,
+background complexity
+Microsoft Kinect Cam-
+era, highly configured
+laptop
+10-100% (Depends on background
+complexity)
+Oliver et al [21]. Hand movement
+detection
+Requires wearing hand band Accelerometer, Joystick
+Manipulator
+Actual accuracy is not measured
+Sadi et al [25]. Hand gesture
+recognition
+Requires finger movement, doesn’t work well under
+daylight or if the background and skin tone match
+RGB Camera, Raspberry
+Pi
+97.14%
+Megalingam et
+al [18].
+Finger movement
+detection
+The user must navigate the touchscreen with their
+hands or fingers and know how to operate the
+application.
+Arduino Uno, HC05,
+Bluetooth, Android
+device
+98%
+Desai et al [20]. Eye movement
+detection
+It’s a preliminary work to model the
+control of a wheelchair, creates complication in
+real-time
+HD Camera, Raspberry
+pi (planned)
+Actual accuracy is not measured
+Kutbi et al [22]. Head movement
+Tracking
+User’s head-motion is detected through a
+head-mounted egocentric camera, which is not
+user-friendly.
+An egocentric camera,
+TI-TAN18CS, Arduino
+Mega
+Accuracy not measured directly. Navigation
+time, number of collisions, survey comments
+were measured for a route in different modes.
+Mahmud et al
+[23].
+Multi-modal
+wheelchair control
+mechanism
+It’s integration of a joy stick with hand
+gesture, eye gaze and head movement tracker. Not
+user-friendly, tracking sensors must be attached to
+the user’s body
+Raspberry pi, RGB
+camera and an
+accelerometer
+Joystick: 94%
+Hand gesture: 92%
+Eye gaze: 86%
+Head movement: 90%
+Multiple: 94%
+Tejonidhi et al
+[24].
+Eye pupil’s move-
+ment detection
+Eye pupil is tracked by a camera and the system
+glows LEDs based on eye movements. The detection
+procedure is crucial for real-time applications
+Web camera, Philips
+microcontroller
+70% to 90%
+https://doi.org/10.1371/journal.pone.0319996.t001
+Fig 1. Steps of the proposed hand gesture recognition technique.
+https://doi.org/10.1371/journal.pone.0319996.g001
+monitoring the movement of an object within a predetermined visual frame. To facilitate the
+development of AI-based applications, various frameworks for hand gesture detection have
+been recently established. One such framework is MediaPipe, which offers multiple options
+including Instant Motion Tracking, Hand Detection, Iris, Pose, Face Recognition, Object
+Detection, and more. In this work, the suggested technique utilizes the MediaPipe Hands
+[26] solution, a high-fidelity technology for tracking hands and fingers, to achieve better
+performance and resilience. This solution employs a machine learning pipeline composed of
+multiple interconnected models to infer 21 3D landmarks of a hand from just a single frame.
+The captured image is required to be transformed from the BGR format (read by OpenCV) to
+the RGB format before the processing, since the ML pipeline expects RGB image as input. The
+hand land marker model bundle comprises a palm detection model and a hand landmarks
+detection model. The Palm detection model traces hands within the input image, and the
+hand landmarks detection model detects specific hand landmarks on the cropped hand image
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 5 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+defined by the palm detection model. Initially, a hand bounding box is created based on palm
+detection using a model. The cropped image region defined by the palm detector is then used
+to generate accurate 3D hand keypoints using a hand landmark model. This hand landmark
+model employs direct coordinate prediction or regression to precisely locate 21 3D coordi-
+nates representing hand knuckles within the detected hand regions. This pre-trained model
+has been trained using approximately 30,000 real-world photos manually categorized with
+precise 3D coordinates, as depicted in Fig 2. To use the technique, the user simply needs to
+place their hand within a specific boundary under the RGB camera. Once the code is executed,
+the hand and its 21 landmark locations are continuously perceived and tracked, regardless
+of different gestures or hand sizes. It can detect hands and the landmarks of any size at any
+distance from the camera. That is why it’s very robust and efficient. After the detection, the
+positions of the hand landmarks will be utilized in next steps.
+3.2. Hand landmarks extraction
+Once the input image of the hand is captured and processed, the coordinates of 21 important
+hand landmarks are haul out and organized into a matrix. Hand landmarks are the few major
+points of the hand consisting of fingertip, wrist and joints of the fingers. The coordinates
+of these landmarks are typically represented as normalized values (x, y, z) format. Here ‘x’
+corresponds to the x-coordinate of the landmark standardized to the range of [0.0, 1.0] based
+on the width of the image. Similarly, ‘y’ represents the y-coordinate of the landmark normal-
+ized to the range of [0.0, 1.0] based on the height of the image. The z-coordinate signifies the
+depth of the landmark and is also normalized to a scale that is roughly proportional to ‘x’.
+The reference point for ‘z’ is the wrist. These coordinates are detected during hand detection
+irrespective of size of hand. Hand is placed on an area and image is taken continuously by
+RGB camera from the top position. Since the landmark coordinates are originally normalized,
+they need to be transformed back to the actual scale. This is achieved by multiplying the coor-
+dinates by the image width and image height. The resulting data is then stored in a separate
+matrix, which is utilized in the suggested model in further calculation. Fig 2 illustrates the
+major 21 hand landmarks of a hand [12]. For wrist of the hand, 1 landmark is detected. For
+thumb, index finger, middle finger, ring finger and pinky finger, 4 landmarks are detected
+for each finger. For any gesture, the landmarks’ positions are changed and updated in matrix
+automatically. These hand landmarks are the important data of hand and these are used in
+later steps to build the proposed mathematical model.
+Fig 2. Major hand landmarks or the key-points.
+https://doi.org/10.1371/journal.pone.0319996.g002
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 6 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+Fig 3. Architectural elements of the proposed hand gesture recognition technique.
+https://doi.org/10.1371/journal.pone.0319996.g003
+3.3. Hand gestures recognition via mathematical model
+The suggested procedure in this research presents a simple design structure comprising hand
+detection, landmarks abstraction, the distance matrix composition, and employment of a
+mathematical model for recognizing the hand gestures, as illustrated in Fig 3. Once the real
+(x, y) coordinates of the 21 landmarks are obtained, the distances from each landmark to the
+remaining 20 key-points are computed using the distance calculation formula. These distances
+are then stored in a hand distance matrix in a pattern. To ensure the detection works effec-
+tively at any hand-camera distance, all distances are normalized relative to the hand width.
+The calculated distance amid the key-points 5 and 17 is defined as the hand width (Fig 2).
+Therefore, the distances are normalized by this hand width accordingly. This normalization
+allows proposed model’s logical conditions to be applicable for hand of any size. Subsequently,
+by applying multiple logical conditions on the normalized distances with the range of three
+crucial thresholds determined earlier, different gesture patterns are recognized and deci-
+sions regarding wheelchair control operations are made. Each specific gesture will be used
+to perform a specific control operation. Gestures are changed using the movement of fingers
+only which has made the proposed model more flexible and suitable for all types of disables
+persons.
+Initially, the proposed technique focuses on three specific gestures for three fundamental
+control operations: ‘Drive’, ‘Stop’, and ‘Horn’. ‘Drive’ gesture is used for moving the wheelchair
+in any direction. ‘Stop’ gesture is used to stop the movement of the wheelchair. And the ‘Horn’
+gesture is applied to alert anyone or any vehicle in front of the wheelchair. Additionally,
+within the ‘Drive’ gesture category, four directional gestures are implemented, namely ‘Drive
+Backward’, ‘Drive Right’, and ‘Drive Left’. The ‘Stop’ gesture serves as the initial gesture to halt
+the wheelchair in any situation or condition. On the other hand, the ‘Horn’ gesture is uti-
+lized to indicate or signal the surrounding environment of wheelchair. As soon as the ‘Drive’
+gesture is recognized, the system transitions into the drive mode, enabling the execution of
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 7 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+Fig 4. Major classes of hand gestures considered in the proposed technique.
+https://doi.org/10.1371/journal.pone.0319996.g004
+movement operations. Fig 4 illustrates the basic classes of hand gestures and the observations
+which are used to perform the three basic control operations of a wheelchair in this paper.
+During the implementation of the proposed ‘Stop’ gesture in this work, it was seen that all
+fingertips maintain the maximum detachment from the hand wrist (keypoint 0). Based on
+this concept, conditions are prepared on hand landmark distances with some thresholds and
+the ‘Stop’ gesture is implemented. When all the distances between keypoint 0 and the finger-
+tips (keypoints 8, 12, 16, and 20) are higher than a specific threshold at a given time, and a
+certain distance threshold is maintained among the fingertips themselves (keypoints 8, 12, 16,
+and 20), then the gesture will be recognized as ‘Stop’. To enhance the efficiency and flexibility
+of the model, a range of maximum and minimum values is determined for these thresholds
+instead of using fixed values. These thresholds are determined at the beginning of the hand
+detection process from a good number of samples in two steps. The mechanism of determin-
+ing these thresholds are discussed afterwards in this paper. Mainly three thresholds are used in
+this work to develop logical conditions need to be satisfied for each gesture.
+Similarly, for the ‘Horn’ gesture, it was observed that the fingertips stay closest to the wrist
+of the hand (keypoint 0). Again, when the detachments measured amid the keypoint 0 to key-
+points 8, 12, 16, and 20 are lower than a specific threshold, then the gesticulation is detected as
+‘Horn’. A range is considered for this threshold as well, allowing flexibility to the user.
+To identify the ‘Drive’ mode gesture, it is observed that, only the apex of the index finger
+(keypoint 8) maintains a greater distance from the wrist of the hand (keypoint 0), while the
+other keypoints of the fingertips stay close to the wrist. Based on this concept, the ‘Drive’
+gesticulation is implemented. For this gesture, also a threshold range is used which made the
+proposed model more efficient and flexible for the disabled people. If the distance between
+keypiont 0 and keypoint 8 falls in a specific range of threshold and all other distances are less
+than another threshold, then ‘Drive’ gesture is detected. If any disabled person cannot stretch
+his index finger fully, he or she will also able to operate this system due to considering range
+of thresholds. During applying the range value it is also considered that it should not be too
+much flexible which can make the system confused and detect the gestures wrongly.
+The logical conditions for recognizing this gesture are outlined in Table 2. Here, d(a,b)
+reflects the normalized distance amid the keypoint ‘a’(x1, y1) and keypoint ‘b’(x2, y2) of the
+hand. The formula used to determine this distance between the keypoints is illustrated in (1).
+2
+( , ) [( ) ( ) ] /
+2 1 2
+= − + −
+d a b x x y y
+2 1
+2 1
+(1)
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 8 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+Table 2. Conditions for basic gestures recognition in the proposed technique.
+Gestures Distance parameters Required conditions to meet
+Drive d 0 8 , ( ) Thld d Thld
+1 0 8 1
+min max
+< ( ) <
+,
+d 0 12
+, ( ) Thld d Thld
+2 0 12 2
+min max
+< ( ) <
+,
+d 0 16
+, ( ) Thld d Thld
+2 0 16 2
+min max
+< ( ) <
+,
+d 0 20
+, ( ) Thld d Thld
+2 0 20 2
+min max
+< ( ) <
+,
+d 0 4 , ( ) d Thld
+, ( ) <
+0 4 1
+Stop d 0 8 , ( ) d Thld
+, ( ) >
+0 8 1
+d 0 12
+, ( ) d Thld
+, ( ) >
+0 12 1
+d 0 16
+, ( ) d Thld
+, ( ) >
+0 16 1
+d 0 20
+, ( ) d Thld
+, ( )>
+0 20 2
+, ( ) >
+d 0 4 , ( ) d Thld
+0 4 2
+d 4 8 , ( ) Thld d Thld
+3 4 8 3
+min max
+< ( ) <
+,
+d 8 12
+, ( ) Thld d Thld
+3 8 12 3
+min max
+< ( ) <
+,
+d 12 16
+3 12 16 3
+, ( ) Thld d Thld
+min max
+< ( ) <
+,
+d 16 20
+3 16 20 3
+, ( ) Thld d Thld
+min max
+< ( ) <
+,
+Horn d 0 8 , ( ) d Thld min
+, ( ) <
+0 8 1
+d 0 12
+, ( ) <
+, ( ) d Thld
+0 12 2
+d 0 16
+, ( ) <
+, ( ) d Thld
+0 16 2
+d 0 20
+, ( ) <
+, ( ) d Thld
+0 20 2
+https://doi.org/10.1371/journal.pone.0319996.t002
+In Table 2, 1st column represents the name of different basic gestures which are used in this
+thesis. 2nd column represents the distances among the major landmarks or keypoints of hand.
+For example, d(0,8) represents the normalized distance between keypoint 0 and keypoint 8 of
+the hand, as marked in Fig 2. The right most columns represents the logical equations which
+need to be met for particular gesture recognition. Some distances are required to be within
+a range of thresholds, some are required to be less than a particular threshold whereas some
+distance values should be bigger than a particular threshold for particular gesture recognition.
+Here, Thld1, Thld2 and Thld3 are the three thresholds which were determined and utilized
+in this work. The range of these thresholds are determined at the start of hand detection for
+once from a good number of samples. During the gesture recognition process, the distances
+are compared with these thresholds and gesture is recognized if all the conditions are met.
+For example, in Table 2, for ‘Drive’ gesture, 5 distances and 4 conditions are considered, and
+all of the 4 conditions on those distances are needed to be satisfied together to recognize that
+particular gesture. Otherwise gesture will not be recognized.
+For Thld1, maximum and minimum range is determined from distances between the hand
+wrist and the fingertips at the time when all the fingertips remain at the maximum distance
+from wrist (fingers are opened). The minimum and maximum values are fetched from the
+distance matrix. Thld2 is an additional threshold determined from the distances between wrist
+and finger tips at the time when fingertips maintain the minimum distance from the wrist.
+The last threshold, Thld3 is the distances between any two consecutive fingertips. The system
+will ask user for giving these two specific gestures as input to calculate threshold ranges. For
+all three thresholds, 100 of live hand images are taken by RGB camera. Each of the distance
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 9 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+from wrist to five fingertips are different naturally. Also, the gaps between any two fingers are
+also not the same. All these required distances are measured and the maximum, minimum
+and mean value is determined for each threshold from the distance matrix using all input
+samples. In the logical conditions, these range are used rather than some absolute threshold
+to make the model more dynamic and flexible to disabled persons. The fundamental control
+hand gestures and the underlying idea behind the development of the suggested mathematical
+model for gesture recognition is presented in Fig 4 which provides a visual representation of
+the basic control gestures and the key principles utilized in the creation of the mathematical
+model.
+When the aforementioned ‘Drive’ gesture is detected for the first moment during execu-
+tion, the fingertip’s location is saved as the starting position. Subsequently, the index finger-
+tip is continuously monitored to recognize the four directional operations which are: Drive
+left, drive right, drive forward, and drive backward, compared to the starting drive location
+of hand. To perform a movement in a specific direction, a certain distance from the starting
+position needs to be stretched by the index fingertip (keypoint 8) in the particular direction.
+These threshold distances are determined based on the size of the image frame which covers
+the hand. For instance, while moving the index finger upward, the output will be recognized
+as “Drive forward” if the fingertip (keypoint 8) crosses a certain distance threshold along the
+vertical direction while keeping a reasonable tolerance distance horizontally. This tolerance
+threshold is introduced to increase user flexibility. Similarly, the recognition of ‘backward’,
+‘left’, and ‘right’ gestures will be based on the crossing of similar distance thresholds by the
+fingertip in their respective directions.
+The logical conditions for recognizing gestures for ‘Drive’ in four directions are outlined
+in Table 3. Here, ‘x
+cur
+’ and ‘ycur’ represents the current x and y-coordinate of the tip of the
+index finger. And, ‘xinit’ and ‘yinit’ represents the initial x-coordinate and y-coordinate of the
+tip of the index finger when ‘Drive’ gesture is recognized for the first time. Again, ‘mov
+’ and
+x
+‘
+mov
+y’ denotes the certain distances which index finger needs to go from initial position in
+x and y direction to recognize the horizontal (Left, Right) and vertical (Forward, backward)
+movement operations respectively. Lastly, ‘tol’ represents the tolerance threshold which can be
+endured horizontally during the vertical movements or vertically during the horizontal move-
+ments of the index finger. It is introduced to give the user flexibility under acceptable limit to
+avoid frequent wrong control operation.
+Fig 5 presents some sample snapshots of the four directional movement gestures taken by
+the RGB camera. The red dot is used to represent the initial position (xinit, yinit) of the tip of the
+index finger when ‘Drive’ gesture is detected for the first time. Then, based on the movement
+Table 3. Conditions used for directional gestures in the proposed technique.
+Gestures Parameters Required conditions to meet
+Drive Right x x
+, x x mov
+cur init
+cur init x− ( ) >
+y y cur init
+, tol y y tol
+< − ( ) <
+cur init
+Drive Left x x
+, x x mov
+cur init
+cur init x− ( ) < −
+y y cur init
+, tol y y tol
+< − ( ) <
+cur init
+Drive Forward y y cur init
+, y y mov
+cur init y− ( )>
+x x
+, tol x x tol
+cur init
+< − ( ) <
+cur init
+Drive_Backward y y cur init
+, y y mov
+cur init y− ( ) < −
+x x
+, tol x x tol
+cur init
+< − ( ) <
+cur init
+https://doi.org/10.1371/journal.pone.0319996.t003
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 10 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+Fig 5. Sample Snapshots of captured images of gesture recognition for directional movements.
+https://doi.org/10.1371/journal.pone.0319996.g005
+Fig 6. Sample Snapshot of ‘Drive Right’ gesture and relevant parameters with thresholds.
+https://doi.org/10.1371/journal.pone.0319996.g006
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 11 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+of the index finger from this initial position, four directional gestures are recognized upon
+satisfying the required logical conditions, as shown in Table 3. The user does not need to move
+full hand for the directional operations, rather only movement of index fingertip is enough to
+recognize the gestures correctly. For example, to perform the ‘Drive right’ gesture, if the user
+moves his or her index finger only in right direction, keeping the wrist in same location, still
+the gesture will be detected as ‘Drive right’ as required conditions will be met. This detection
+is continuous and if the user moves his finger from a direction to another, the detected gesture
+type will also be changed accordingly.
+From the sample ‘Drive Right’ gesture snapshot as shown in Fig 6, it can be seen that the
+amount of movement of index fingertip from (xinit, yinit) to (x
+cur, ycur) is such that it crosses the
+threshold mov
+x to the right direction, while maintaining the fingertip position within a certain
+acceptable distance (tol) along the vertical direction. As per the proposed algorithm, this ges-
+ture is recognized as ‘Drive Right’ gesture. Similarly, other directional gestures are recognized
+with different logical conditions. The user needs to move his or her finger only in desired
+direction. It is not mandatory to move the whole hand in any direction.
+Ethics statement
+Ethical approval for this experiment for testing the proposed technique by human participant,
+has been obtained from Institutional Review Board (IRB), BUET, Dhaka, Bangladesh (Ref/
+BUET/RISE/IRB/2025-01).
+4. Results and discussions
+This part presents an analysis of the overall performance and results attained from the
+proposed mathematical hand gesture recognition technique designed for a smart wheelchair
+including a comparison with other existing methods.
+4.1. Experimental setup
+For the testing of the proposed hand gesture recognition technique, the hand was kept on a
+small structure having different colors in background and the RGB camera is set on top of
+it in such a way that it captures image of hand from top position. The camera is connected
+to a laptop of model HP ProBook 440 G6, through a USB cable and the program of gesture
+recognition algorithm is run in that laptop using Python 3.10. The whole technique was tested
+both in indoor and outdoor environment under daylight with a good number of hand samples
+captured by the camera.
+The proposed technique in this work has also been tested in a real powered wheelchair
+system [25]. The system consists of two processing units: a Raspberry Pi 4 model B (1 GB
+RAM and 1.5 GHz of CPU frequency), and an Arduino Uno microcontroller. The primary
+processing device is Raspberry Pi. Its raw input voltage is 5V with 3A. For powering up this
+unit, a DC-DC buck converter is used to convert the 12V from the supply battery to 5.4V with
+a maximum 3A output current, which is needed for the Raspberry Pi in overclocking mode.
+Thus, CPU speed goes up to 2.0GHz and provides faster real-time processing. It generated the
+control commands by performing gesture recognition. In this system, two motor drivers and
+the Raspberry Pi are connected via Arduino to enable motor navigation. Through serial com-
+munication, Arduino receives instructions based on input gestures from the main processor
+unit (Raspberry Pi). Then, it directs particular PWM impulses at motor drivers. The system
+has also two DC motors having a power rating of 250W.
+The control circuit of the used smart wheelchair system consists of two motor-drivers
+combined with an Arduino Uno CPU and their connection to a DC power source. The
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 12 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+Fig 7. Interfacing of the (a) motor and (b) moto driver used in the smart wheelchair system.
+https://doi.org/10.1371/journal.pone.0319996.g007
+system utilizes the MY1016Z2 motor as Fig 7 illustrates. Its power rating is 250 Watts (0.33
+Horsepower), and it runs at 24 V and 13.4 Amps. This motor can rotate in both clockwise
+and counterclockwise directions. Its rated load RPM is 400, and its no-load RPM is 3300. The
+motor driver model used here is the BTS7960. This driver’s specifications are appropriate and
+meet the requirements. Compared to the conventional four relay control circuit, this motor
+driver offers a more convenient H-bridge control circuit. Each motor driver has 8 control pins
+including + 5 V Vcc and GND; three pins of them are R_EN, RPWM, R_IS that are engaged
+in forwarding rotation, and the other three L_EN, LPWM, L_IS are engaged in the backward
+rotation. These 8 control pins are receiving signals from connected Arduino-Uno. Arduino
+is linked with Raspberry pi for receiving signals based on different hand gestures. Therefore,
+Fig 8. The structure of the smart wheelchair system used for testing the proposed gesture recognition technique.
+https://doi.org/10.1371/journal.pone.0319996.g008
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 13 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+Fig 9. Actual user operating the hand gesture-controlled wheelchair.
+https://doi.org/10.1371/journal.pone.0319996.g009
+circumventing specific PWM values through Raspberry pi, the motors can be operated. The
+complete structure of the used smart wheelchair system is shown in Fig 8. The proposed ges-
+ture recognition model has been integrated in this wheelchair system for the purpose of test-
+ing. The test was done with an actual user, whose one leg is disabled due to typhoid. A picture
+with the actual user is shown in Fig 9. The wheelchair performs different control operations
+according to different gestures by the user. We found the wheelchair is functioning properly
+with the proposed gesture detection mathematical model and the test has been successful.
+4.2. Results
+The proposed hand gesture recognition technique provides the gesture names as output
+according to the fulfillment of logical conditions of distances with thresholds. In the testing,
+after detecting hand for the first time under camera, it captures image for determining the
+three thresholds sequentially. It will ask to place hands and then calculate three thresholds
+Thld1, Thld2, Thld3 automatically as per the proposed algorithm. Then the program goes to
+the main gesture recognition module for new gesture recognition which will eventually help
+to perform wheelchair operations. The RGB camera captures hand image from the top of
+hand continuously, processes the image and detect gesture as per logical conditions which are
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 14 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+Table 4. Confusion matrix of the testing of proposed hand gesture recognition technique.
+Detected
+Performed
+Stop
+Horn
+Drive Stop
+Drive
+Forward
+Drive
+Backward
+Drive Left
+Drive
+Right
+Recall
+Precision
+F1 Score
+Accuracy
+Overall
+Accuracy
+Stop 98 1 1 0.980 1.000 0.990 98% 98.14%
+Horn 98 1 1 0.980 1.000 0.990 98%
+Drive Stop 99 1 0.990 0.900 0.947 99%
+Drive Forward 2 98 0.980 0.990 0.985 98%
+Drive Backward 1 99 0.990 1.000 0.995 99%
+Drive Left 3 97 0.970 0.990 0.980 97%
+Drive Right 2 98 0.980 0.990 0.985 98%
+Here the used gestures perform wheelchair operations as below:
+Stop: The wheelchair will be stopped immediately from moving
+Horn: The wheelchair will give horn
+Drive Stop: The wheelchair will go to driving mode (standstill and ready for driving)
+Drive Forward: The wheelchair will start moving in straight forward direction
+Drive Backward: The wheelchair will start moving in its backward direction
+Drive Left: The wheelchair will start moving in its left direction
+Drive Right: The wheelchair will start moving in its right direction
+https://doi.org/10.1371/journal.pone.0319996.t004
+established in this thesis. The output shows in real-time. If the user changes the hand gesture,
+the output will change accordingly.
+The three basic gestures and four directional movements are taken into consideration for
+performance analysis. Table 4 displays the confusion matrix, where each row represents the
+real hand gesture and each column represents the predicted gesture. The proposed technique
+achieved a testing accuracy of 98.14% and a recognition rate of over 21 FPS (frames per
+second). The testing involved 100 samples for each hand gestures under different lightning
+conditions. Various performance measuring parameters are determined from the performed
+and predicted gestures’ count. These parameters are - Precision, Recall and F1 score of the
+technique. The F1 score, which measures the model’s ability to balance recall (capturing
+positive cases) and precision (accuracy of captured cases), is calculated for each gesture. The
+F1 score is the harmonic mean of precision and recall. Here, Precision, Recall and F1 Score is
+calculated using below formula.
+Recall TP
+TP FN=
++
+Precision
+TP
+TP FP=
++
+2
+× ×
+Recall Precision
+F Score
+1
+=
+Recall Precision
++
++
+Accuracy TN TP
+TN FP TP FN=
++ + +
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 15 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+Here,
+TP = True Positive = An instance for which both predicted and actual values are positive
+(the technique predicts a gesture when a gesture is actually performed).
+FP = False Positive = An instance for which predicted value is positive but actual value is
+negative (the technique predicts a gesture but no gesture is actually performed).
+FN = False Negative = An instance for which predicted value is negative but actual value is
+positive (the technique doesn’t predict a gesture but a gesture is actually performed).
+TN = True Negative = An instance for which both predicted and actual values are negative
+(the technique doesn’t predict gesture and actually no gesture is performed)
+TP+FP = Total number of detected gestures by the technique for each gesture category
+TP+FN = Total number of actually performed gestures for each gesture category = 100
+F1 Score is calculated from Precision and Recall.
+Overall Accuracy = Overall accuracy of the technique for all gestures
+= (Accurately detected count/ Total sample count)
+×
+100%
+Higher precision of any algorithm means that the algorithm returns more relevant results
+than the irrelevant ones. It measures the percentage of predictions made by the model that are
+correct. High recall means that an algorithm returns most of the relevant results (whether or
+not irrelevant ones are also returned). It measures the percentage of relevant data points that
+were correctly identified by the model. F1 score is a machine learning evaluation metric that
+measures a model’s accuracy. It combines the precision and recall scores of a model. Notably,
+the proposed technique achieved an F1 score greater than 0.9 for all seven gestures.
+It can be seen that few gestures are recognized incorrectly during each type of gesture rec-
+ognition. To check the accuracy of each gesture separately, continuous 100 samples were taken
+for each gesture using different sizes of hands of multiple people of different ages in varying
+lighting conditions. For some cases, the fingers were not be placed properly as per defined
+gestures. For example, during the incorrect Horn gesture, the index finger slightly came out
+which falls in the range of Threshold1. Similarly, for the wrongly recognized gestures, most
+are recognized as ‘Drive Stop’ gesture. This might happen due to the slight crossing of thresh-
+olds’ minimum value or the size of index finger for different persons, leading to incorrect
+detection. Further precise logical conditions can be applied to increase the accuracy.
+Also, an evaluation synopsis of associated researches is presented in Table 5. Amid these
+works, Gao et al. [19] proposed a recognition system that necessitates lifting a hand in order
+to perform any gesture, but it’s ineffectual for individuals having mobility impairment and
+Table 5. Comparison of related work with the proposed technique.
+Features Proposed Techniques
+Gao et al [19]. Oliver et al [21]. Sadi et al [25]. Proposed Technique
+Functionality Hand gesture
+recognition
+Hand movement
+detection
+Hand gesture recognition Hand gesture recognition
+Requirements and
+Limitations
+Require hand raising,
+background complexity
+Requires wearing hand
+band
+Requires finger movement, RGB Cam-
+era, Raspberry Pi. It doesn’t work well
+under daylight or if the background and
+skin tone matches.
+Requires finger movement, RGB Camera. A math-
+ematical model is utilized. Performs well at indoor
+or outdoor, irrespective of background color.
+Major Equipment Microsoft Kinect Cam-
+era, highly configured
+laptop
+Accelerometer, Joystick
+Manipulator
+RGB Camera, Raspberry Pi RGB Camera
+(for gesture recognition)
+Cost High Medium Low Low
+Recognition Suc-
+cess rate
+10-100% (Depends on
+background complexity)
+Actual accuracy is not
+measured
+97.14% 98.14%
+https://doi.org/10.1371/journal.pone.0319996.t005
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 16 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+unintuitive. Also, it uses a Microsoft Kinect Depth camera which is expensive and the perfor-
+mance severely degrades when background complexity arises. Oliver et al.’s [21] method of
+using an accelerometer, which requires movement to function and needs hand band wear-
+ing, is not effective for many people with dexterity issues. Our suggested model solves these
+problems by allowing users to safely steer using just their fingers’ movement. The users will be
+able to operate it easily with less energy. A system suggested by Sadi et al. [25] using 2D CNN
+and skin segmentation also works by finger movement, but it creates problem if the back-
+ground color matches with the skin tone in any way or under daylight. By utilizing a mathe-
+matical model, our proposed technique also solved these issues. This model functions well on
+any background or in daylight and for any size of hands in any environment. This made the
+model more resilient and efficient. So, this proposed system will be very useful for the disabled
+people by giving them highest user friendliness with highest accuracy. Moreover, the pro-
+posed technique achieved an F1 score greater than 0.9 for all seven gestures, indicating that it
+predicts each observation with a high level of relevancy and accuracy.
+There is an improvement in this work compared to our previous work [27] on the same
+topic. In our previous work, all the thresholds were considered as fixed threshold values rather
+than a range of maximum and minimum threshold values. Moreover, those thresholds were
+not automatically calculated from hand samples. That is why the technique was less dynamic
+and sometimes the output was misleading. Again, the technique was not working good for
+some special disability cases. For example, for the ‘Drive’ gesture, detection was not possible
+for those users who cannot make his index finger fully straight for any illness or disabilities.
+Hence, the distance between wrist to fingertip didn’t meet the condition with threshold.
+Keeping this in mind, a maximum and minimum values were determined for all thresholds
+at the beginning of hand detection for once. After using this range concept, it would be easy
+to meet the thresholds and making the technique more dynamic and more useful for disabled
+people. Fig 10 to Fig 13 illustrates these issues and comparison between our old and new
+methodology.
+Fig 10 and Fig 11 illustrate the comparison between response of our previous and current
+proposed methodology for ‘Drive’ gesture for the case of a disabled person who cannot make
+his index finger straight properly. In our old methodology, the threshold Thld1 is considered
+Fig 10. Problem in ‘Drive’ gesture recognition in our previous methodology [27].
+https://doi.org/10.1371/journal.pone.0319996.g010
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 17 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+Fig 11. Successful ‘Drive’ gesture recognition in current proposed methodology.
+https://doi.org/10.1371/journal.pone.0319996.g011
+Fig 12. Problem in ‘Stop’ gesture recognition in our previous methodology [27].
+https://doi.org/10.1371/journal.pone.0319996.g012
+a fixed threshold always. As a result, the technique failed to detect the gesture for that disabled
+person because d(0,8) couldn’t cross the threshold Thld1. But, in the new proposed meth-
+odology, a maximum and minimum range of Thld1 is used rather than fixed threshold and
+distance d(0,8) falls between the maximum and minimum range of Thld1 and therefore the
+gesture is recognized properly. This makes the proposed technique more flexible and efficient.
+The threshold range is determined from distance matrix of live samples of hand so that the
+range doesn’t become too high or too small which could increase false detection probability.
+Fig 12 and Fig 13 illustrate the comparison between response of our previous and current
+proposed methodology for ‘Stop’ gesture for the case of a disabled person who are unable to
+stretch his fingers properly. Here, due to applying range of threshold for Thld3 in proposed
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 18 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+Fig 13. Successful ‘Stop’ gesture recognition in current proposed methodology.
+https://doi.org/10.1371/journal.pone.0319996.g013
+Table 6. Confusion matrix for previous methodology of hand gesture recognition technique [27].
+Prediction
+Performed
+Stop
+Horn
+Drive Stop
+Drive
+Forward
+Drive
+Backward
+Drive Left
+Drive Right
+Recall
+Precision
+F1 Score
+Accuracy
+Overall
+Accuracy
+Stop 97 1 2 0.970 1.000 0.985 97% 97.00%
+Horn 98 2 0.980 0.951 0.966 98%
+Drive Stop 4 95 1 0.950 0.888 0.918 95%
+Drive Forward 2 97 1 0.970 0.970 0.970 97%
+Drive Backward 2 98 0.980 1.000 0.990 98%
+Drive Left 3 1 96 0.960 1.000 0.980 96%
+Drive Right 1 1 98 0.980 0.990 0.985 98%
+https://doi.org/10.1371/journal.pone.0319996.t006
+new method, rather than a fixed threshold value like old method, the technique enables
+correct recognition of ‘Stop’ gesture. In the new proposed technique, if the distance between
+the fingertips are maintained such that it remains inside the threshold range, then the gesture
+will be detected. But in old technique, it always required to cross a fixed threshold for ‘Stop’
+gesture detection which might be difficult for some disabled aged persons. Thus, the proposed
+new technique becomes more suitable, dynamic and flexible and will work for different types
+of disabled and aged persons who will use the wheelchair.
+Table 6 displays the confusion matrix using our previous methodology [27] for similar
+number of input samples used in proposed new methodology. It can be seen that, the average
+F1 score was 0.97 and the Accuracy was 97% which is poorer than our current methodology
+(Table 4). Specially the performance issues due to considering fixed threshold values rather
+than a range, which are demonstrated in Fig 10 to Fig 13, is also reflected in the confusion
+matrix. So, our current methodology performs better than the old one after considering maxi-
+mum and minimum range of thresholds instead of fixed thresholds. It will make the proposed
+technique more usable and flexible to the users having different types of dexterity issues.
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 19 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+5. Conclusions
+The primary objective of this work is the development of a real-time hand gesture recog-
+nition technique that enables controlling wheelchair in the most flexible way using finger
+movements of hands of any size, in both indoor and outdoor lightening condition. In the
+existing methodologies of various researchers, their proposed techniques are not so suitable
+and ­ efficient for users having dexterity problems and some techniques developed using skin
+segmentation and CNN, don’t work well under daylight on any background. In light of these
+difficulties, a novel mathematical model has been designed using the positions and distances
+among major hand landmarks and a few thresholds. The basic three wheelchair operations-
+‘Drive’, ‘Stop’, ‘Horn’, along with driving in four directions are implemented. The proposed
+model has also been experimented in an electric wheelchair. The experimental results show
+that the technique suggested in this work achieved a testing accuracy of 98.14%, with a recog-
+nition speed of greater than 21 FPS, whereas other related methodologies obtained variable
+success rate between 10–100% and the recent methodology achieved 97.14%. So, the proposed
+methodology outperforms the existing methodologies. Our proposed technique has the capa-
+bility to control a wheelchair effectively in a real-time environment using the movement of
+fingers only. So, it’s more flexible for disabled and elderly people than other existing systems.
+It works well under daylight or in indoor environment. We hope to extend more advanced
+features in the future for implementing more useful control operations of wheelchair.
+6. Suggestion for future work
+In the proposed technique, basic wheelchair operations have been implemented by gesture
+recognition. In future, further useful control operations can be developed which may include-
+changing speed of wheelchair, fall detection, emergency brake, etc. Incorporating these func-
+tionalities will give the users more security and reliability. These may require recognition of
+more different gestures other than used gestures in this paper, where new conditions on hand
+landmarks with thresholds and critical calculations might be required. Also, an online moni-
+toring system or android application can be developed to monitor wheelchair users’ real-time
+status to ensure safety and analyze their daily activities from the data which may be used for
+further research and for the treatment of the disabled people. An alarm system can be devel-
+oped in case of any fall detection or long-time inactivity of the wheelchair users. Moreover,
+more precision calculation on thresholds range can be explored to achieve higher recognition
+success rate. A qualitative study on higher number of individuals with disabilities and testing
+in a specific route with blockages can be conducted with more evaluation matrices.
+Acknowledgments
+Institute of Information and Communication (IICT), Bangladesh University of Engineering
+and Technology (BUET), is to be expressed gratitude on behalf of the authors for providing all
+necessary assistance to conduct this study.
+Author contributions
+Conceptualization: Md. Liakot Ali, Muhammad Sheikh Sadi.
+Data curation: Md Rafiul Huda.
+Formal analysis: Md Rafiul Huda.
+Investigation: Md. Liakot Ali, Md Rafiul Huda.
+Methodology: Md. Liakot Ali, Md Rafiul Huda, Muhammad Sheikh Sadi.
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 20 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+Resources: Muhammad Sheikh Sadi.
+Software: Md Rafiul Huda.
+Supervision: Md. Liakot Ali, Muhammad Sheikh Sadi.
+Validation: Md. Liakot Ali, Md Rafiul Huda.
+Visualization: Md. Liakot Ali.
+Writing – original draft: Md Rafiul Huda.
+Writing – review & editing: Md. Liakot Ali, Md Rafiul Huda, Muhammad Sheikh Sadi.
+References
+1. 2. 3. 4. “World Report on Disability.” [cited 2023 May 1]. Available from: https://www.who.int/teams/
+noncommunicable-diseases/sensory-functions-disability-and-rehabilitation/world-report-on-disability
+Paul S, Nahar A, Bhagawati M, Kunwar AJ. A review on recent advances of cerebral palsy. Oxidative
+medicine and cellular longevity. 2022;2022.
+Narayanan KL, Niranjana R, Vinothini S, Krishnan RS, Rajkumar GV, Rachel L. “Internet of Things
+and Artificial Intelligence Enabled Smart Wheel Chair,” in 2023 International Conference on Inventive
+Computation Technologies (ICICT), 2023: IEEE. 1436-1440.
+Pingali TR, Lemaire ED, Baddour N. Ultrasonic Tethering to Enable Side-by-Side Following for
+Powered Wheelchairs. Sensors (Basel). 2018;19(1):109. https://doi.org/10.3390/s19010109 PMID:
+30598029
+5. 6. 7. Qi L, Ferguson-Pell M, Lu Y. The Effect of Manual Wheelchair Propulsion Speed on Users’ Shoulder
+Muscle Coordination Patterns in Time-Frequency and Principal Component Analysis. IEEE Trans Neu-
+ral Syst Rehabil Eng. 2019;27(1):60–5. https://doi.org/10.1109/TNSRE.2018.2886826 PMID: 30571642
+Devigne L, Aggravi M, Bivaud M, Balix N, Teodorescu CS, Carlson T, et al. Power Wheelchair Naviga-
+tion Assistance Using Wearable Vibrotactile Haptics. IEEE Trans Haptics. 2020;13(1):52–8. https://doi.
+org/10.1109/TOH.2019.2963831 PMID: 31905149
+Wang K-J, Zhang L, Luan B, Tung H-W, Liu Q, Wei J, et al. Brain-computer interface combining eye
+saccade two-electrode EEG signals and voice cues to improve the maneuverability of wheelchair.
+IEEE Int Conf Rehabil Robot. 2017;2017:1073–8. https://doi.org/10.1109/ICORR.2017.8009392 PMID:
+28813964
+8. 9. 10. 11. 12. 13. 14. 15. 16. 17. 18. Kim EY. Vision‐based wheelchair navigation using geometric AdaBoost learning. Electronics Letters.
+2017;53(8):534–6. https://doi.org/10.1049/el.2016.3865
+Leaman J, La HM. A Comprehensive Review of Smart Wheelchairs: Past, Present, and Future. IEEE
+Trans Human-Mach Syst. 2017;47(4):486–99. https://doi.org/10.1109/thms.2017.2706727
+Coleman G, Ward R. Gesture Recognition: Performance, Applications and Features. Nova Science
+Publishers, Incorporated; 2018.
+Rezwanul Haque Md, Milon Islam Md, Saeed Alam K, Iqbal H. A Computer Vision based Lane Detec-
+tion Approach. IJIGSP. 2019;11(3):27–34. https://doi.org/10.5815/ijigsp.2019.03.04
+Mousavi Hondori H, Khademi M. A Review on Technical and Clinical Impact of Microsoft
+Kinect on Physical Therapy and Rehabilitation. J Med Eng. 2014;2014:846514. https://doi.
+org/10.1155/2014/846514 PMID: 27006935
+Memo A, Minto L, Zanuttigh P. Exploiting silhouette descriptors and synthetic data for hand gesture
+recognition.in Italian Chapter Conference 2015 - Smart Tools and Apps in computer Graphics. STAG;
+2015.
+Keskin C, Kıraç F, Kara YE, Akarun L. “Real time hand pose estimation using depth sensors,” in Con-
+sumer depth cameras for computer vision. Springer. 2013:119-137.
+Soo S. Object detection using Haar-cascade Classifier. Institute of Computer Science. 2014;2(3):1–12.
+Shaik KB, Ganesan P, Kalist V, Sathish BS, Jenitha JMM. Comparative Study of Skin Color Detec-
+tion and Segmentation in HSV and YCbCr Color Space. Procedia Computer Science. 2015;57:41–8.
+https://doi.org/10.1016/j.procs.2015.07.362
+“MediaPipe Hands.” [Cited 2023 May 1]. Available from: https://solutions.mediapipe.dev/hands
+Megalingam RK, Sreekanth S, Govardhan A, Teja CR, Raj A. Wireless gesture controlled wheel-
+chair. in 2017 4th International Conference on Advanced Computing and Communication Systems
+(ICACCS). 2017:1–5.
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 21 / 22
+PLOS One Developing a real-time hand-gesture recognition technique
+19. 20. 21. Gao X, Shi L, Wang Q. The design of robotic wheelchair control system based on hand gesture con-
+trol for the disabled. in 2017 International Conference on Robotics and Automation Sciences (ICRAS).
+2017:30–4. https://doi.org/10.1109/icras.2017.8071911
+Desai JK, Mclauchlan L. Controlling a wheelchair by gesture movements and wearable technology. in
+2017 IEEE International Conference on Consumer Electronics (ICCE). 2017:402–3.
+Oliver S, Khan A. Design and evaluation of an alternative wheelchair control system for dexterity
+disabilities. Healthc Technol Lett. 2019;6(4):109–14. https://doi.org/10.1049/htl.2018.5047 PMID:
+31531225
+22. 23. 24. 25. Kutbi M, Chang Y, Mordohai P. “Hands-Free Wheelchair Navigation Based on Egocentric Computer
+Vision: A Usability Study,” in Conference: Workshop on Assistance and Service Robotics in a Human
+Environment, Vancouver, British Columbia, Canada; 2017.
+Mahmud S, Lin X, Kim J-H, Iqbal H, Rahat-Uz-Zaman M, Reza S, et al. A Multi-Modal Human
+Machine Interface for Controlling a Smart Wheelchair.in Proceedings of the IEEE 7th Conference on
+Systems, Process and Control (ICSPC). 2019:10–3.
+Tejonidhi MR, Vinod AM. Oculus supervised wheelchair control for people with locomotor disabilities.
+in Proceedings of the International Conference on Recent Advances in Electronics and Communica-
+tion Technology. ICRAECT, Bangalore, India. 2017;2017:254–9.
+Sadi MS, Alotaibi M, Islam MR, Islam MS, Alhmiedat T, Bassfar Z. Finger-Gesture Controlled Wheel-
+chair with Enabling IoT. Sensors (Basel). 2022;22(22):8716. https://doi.org/10.3390/s22228716 PMID:
+36433326
+26. 27. Zhang F, Bazarevsky V, Vakunov A, Tkachenka A, Sung G, Chang C-L, et al. “Mediapipe hands:
+On-device real-time hand tracking,” 2020, arXiv:2006.10214.
+Huda MR, Ali ML, Sadi MS. Real-Time hand-gesture recognition for the control of wheelchair. in 2022
+12th International Conference on Electrical and Computer Engineering (ICECE). 2022:384–7.
+PLOS One | https://doi.org/10.1371/journal.pone.0319996 April 24, 2025 22 / 22</question>
+
+## Core Principles
+You operate by the holy trinity of software engineering: **YAGNI** (You Aren't Gonna Need It), **KISS** (Keep It Simple, Stupid), and **DRY** (Don't Repeat Yourself). Every solution you propose must honor these principles.
+
+## Your Expertise
+- System architecture design and scalability patterns
+- Risk assessment and mitigation strategies
+- Development time optimization and resource allocation
+- User Experience (UX) and Developer Experience (DX) optimization
+- Technical debt management and maintainability
+- Performance optimization and bottleneck identification
+
+## Your Approach
+1. **Question Everything**: Ask probing questions to fully understand the user's request, constraints, and true objectives. Don't assume - clarify until you're 100% certain.
+
+2. **Brutal Honesty**: Provide frank, unfiltered feedback about ideas. If something is unrealistic, over-engineered, or likely to cause problems, say so directly. Your job is to prevent costly mistakes.
+
+3. **Explore Alternatives**: Always consider multiple approaches. Present 2-3 viable solutions with clear pros/cons, explaining why one might be superior.
+
+4. **Challenge Assumptions**: Question the user's initial approach. Often the best solution is different from what was originally envisioned.
+
+5. **Consider All Stakeholders**: Evaluate impact on end users, developers, operations team, and business objectives.
+
+## Collaboration Tools
+- Consult the `planner` agent to research industry best practices and find proven solutions
+- Engage the `docs-manager` agent to understand existing project implementation and constraints
+- Use `Search Google` tool from `searchapi` MCP server to find efficient approaches and learn from others' experiences
+- Use `docs-seeker` skill to read latest documentation of external plugins/packages
+- Leverage `ai-multimodal` skill to analyze visual materials and mockups
+- Query `psql` command to understand current database structure and existing data
+- Employ `sequential-thinking` skill for complex problem-solving that requires structured analysis
+
+## Your Process
+1. **Discovery Phase**: Ask clarifying questions about requirements, constraints, timeline, and success criteria
+2. **Research Phase**: Gather information from other agents and external sources
+3. **Analysis Phase**: Evaluate multiple approaches using your expertise and principles
+4. **Debate Phase**: Present options, challenge user preferences, and work toward the optimal solution
+5. **Consensus Phase**: Ensure alignment on the chosen approach and document decisions
+6. **Documentation Phase**: Create a comprehensive markdown summary report with the final agreed solution
+
+## Output Requirements
+When brainstorming concludes with agreement, create a detailed markdown summary report including:
+- Problem statement and requirements
+- Evaluated approaches with pros/cons
+- Final recommended solution with rationale
+- Implementation considerations and risks
+- Success metrics and validation criteria
+- Next steps and dependencies
+* **IMPORTANT:** Sacrifice grammar for the sake of concision when writing outputs.
+
+## Critical Constraints
+- You DO NOT implement solutions yourself - you only brainstorm and advise
+- You must validate feasibility before endorsing any approach
+- You prioritize long-term maintainability over short-term convenience
+- You consider both technical excellence and business pragmatism
+
+**Remember:** Your role is to be the user's most trusted technical advisor - someone who will tell them hard truths to ensure they build something great, maintainable, and successful.
+
+**IMPORTANT:** **DO NOT** implement anything, just brainstorm, answer questions and advise.
+
+---
+
+kiểu nó đều cao như nhau nên thấy so sánh rất buồn cười, /brainstorm lại làm tương tự như paper trên nhưng áp dung vào game xếp hình của chúng ta được không ?
+
+---
+
+You are a Solution Brainstormer, an elite software engineering expert who specializes in system architecture design and technical decision-making. Your core mission is to collaborate with users to find the best possible solutions while maintaining brutal honesty about feasibility and trade-offs.
+
+## Answer this question: 
+<question>The user realizes that comparing 6 methods where they all get near-100% accuracy looks absurd academically. They want to completely restructure the project to follow the Huda et al. (PLOS ONE 2025) approach: instead of a classification comparison paper, make it an APPLICATION paper about their puzzle game, using a mathematical model for gesture-to-game-control mapping. 
+
+Key context from Huda et al.:
+- Single mathematical model using MediaPipe landmarks + distance thresholds
+- Focus is on the APPLICATION (wheelchair control), not comparing classifiers
+- 3 gestures (Drive/Stop/Horn) + 4 directional movements
+- Dynamic threshold ranges for user flexibility
+- Contribution = the mathematical model + the deployed system
+- 98.14% accuracy, 21+ FPS
+
+Current project has:
+- 5 gestures (Pinch, Fist, Open Hand, Frame, None) for puzzle game control
+- MLP classifier (99.8%, 227KB) deployed in browser via ONNX
+- Grid-based swipe mathematical model (already implemented in game/gesture.js)
+- Working browser puzzle game at 30+ FPS
+- HaGRID v2 dataset (23,850 samples, 13,250 subjects)
+
+The question: Can we restructure to be like Huda's paper but for puzzle game control? What would we KEEP, what would we DROP, and what's the new narrative structure?
+
+Read game/gesture.js to understand the existing mathematical model, and outputs/presentation.tex for current structure.</question>
+
+## Core Principles
+You operate by the holy trinity of software engineering: **YAGNI** (You Aren't Gonna Need It), **KISS** (Keep It Simple, Stupid), and **DRY** (Don't Repeat Yourself). Every solution you propose must honor these principles.
+
+## Your Expertise
+- System architecture design and scalability patterns
+- Risk assessment and mitigation strategies
+- Development time optimization and resource allocation
+- User Experience (UX) and Developer Experience (DX) optimization
+- Technical debt management and maintainability
+- Performance optimization and bottleneck identification
+
+## Your Approach
+1. **Question Everything**: Ask probing questions to fully understand the user's request, constraints, and true objectives. Don't assume - clarify until you're 100% certain.
+
+2. **Brutal Honesty**: Provide frank, unfiltered feedback about ideas. If something is unrealistic, over-engineered, or likely to cause problems, say so directly. Your job is to prevent costly mistakes.
+
+3. **Explore Alternatives**: Always consider multiple approaches. Present 2-3 viable solutions with clear pros/cons, explaining why one might be superior.
+
+4. **Challenge Assumptions**: Question the user's initial approach. Often the best solution is different from what was originally envisioned.
+
+5. **Consider All Stakeholders**: Evaluate impact on end users, developers, operations team, and business objectives.
+
+## Collaboration Tools
+- Consult the `planner` agent to research industry best practices and find proven solutions
+- Engage the `docs-manager` agent to understand existing project implementation and constraints
+- Use `Search Google` tool from `searchapi` MCP server to find efficient approaches and learn from others' experiences
+- Use `docs-seeker` skill to read latest documentation of external plugins/packages
+- Leverage `ai-multimodal` skill to analyze visual materials and mockups
+- Query `psql` command to understand current database structure and existing data
+- Employ `sequential-thinking` skill for complex problem-solving that requires structured analysis
+
+## Your Process
+1. **Discovery Phase**: Ask clarifying questions about requirements, constraints, timeline, and success criteria
+2. **Research Phase**: Gather information from other agents and external sources
+3. **Analysis Phase**: Evaluate multiple approaches using your expertise and principles
+4. **Debate Phase**: Present options, challenge user preferences, and work toward the optimal solution
+5. **Consensus Phase**: Ensure alignment on the chosen approach and document decisions
+6. **Documentation Phase**: Create a comprehensive markdown summary report with the final agreed solution
+
+## Output Requirements
+When brainstorming concludes with agreement, create a detailed markdown summary report including:
+- Problem statement and requirements
+- Evaluated approaches with pros/cons
+- Final recommended solution with rationale
+- Implementation considerations and risks
+- Success metrics and validation criteria
+- Next steps and dependencies
+* **IMPORTANT:** Sacrifice grammar for the sake of concision when writing outputs.
+
+## Critical Constraints
+- You DO NOT implement solutions yourself - you only brainstorm and advise
+- You must validate feasibility before endorsing any approach
+- You prioritize long-term maintainability over short-term convenience
+- You consider both technical excellence and business pragmatism
+
+**Remember:** Your role is to be the user's most trusted technical advisor - someone who will tell them hard truths to ensure they build something great, maintainable, and successful.
+
+**IMPORTANT:** **DO NOT** implement anything, just brainstorm, answer questions and advise.
+
+---
+
+Bây giờ này, gọi agents team ra, càng nhiều agents càng tốt. Debate và reframe lại bài này một cách hợp lý và chuẩn chỉ cho việc trình bày. Đọc xong professor phải cho điểm cao luôncho topic A Vision-First Multi-Modal Approach for Hand Gesture Recognition . Commit trước rồi bao giờ xong hẳn mới được dừng
+
+---
+
+[Request interrupted by user]
+
+---
+
+tiếp tục lại đi,  Debate và reframe lại bài này một cách hợp lý và chuẩn chỉ cho việc trình bày. Đọc xong             
+  professor phải cho điểm cao luôncho topic A Vision-First Multi-Modal Approach for Hand Gesture Recognition . Vì đây là topic chung professor yêu cầu
+
+---
+
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+Analysis:
+Let me chronologically analyze the conversation:
+
+1. **Session Start (from compacted context)**: The user had a CV course project on hand gesture recognition. Previous session involved reviewing the project, identifying that 6 methods all getting ~100% accuracy is academically weak, brainstorming improvements, and reading 3 reference papers (Huda et al., Al Farid et al., Nguyen et al.).
+
+2. **Brainstorm skill invocation**: The user asked to brainstorm with reference to the Huda et al. paper about trimming the presentation. I read presentation.tex (13 slides) and report.tex (first 100 lines), then provided a detailed trimming plan:
+   - Remove slides 5 (Two Feature Streams), 8 (Understanding Failures), 9 (Ceiling Effect)
+   - Merge slides 2+3, 6+7, 10+11
+   - Proposed 8-slide structure
+   - Recommended retitling (but user later clarified title is professor-mandated)
+
+3. **User's key realization**: "kiểu nó đều cao như nhau nên thấy so sánh rất buồn cười" - comparing methods where they all score similarly high looks ridiculous. Asked to restructure like Huda et al. paper but for their puzzle game.
+
+4. **Second brainstorm**: I read game/gesture.js (654 lines - the GestureController class with MLP+CNN ONNX inference, heuristic fallback, preprocessing) and game/main.js (882 lines - the full game with state machine IDLE→GRABBING→FIST_HOLD, grid-based swipe at lines 677-718, debounce buffer). Key finding: the code at main.js:677-718 already implements Huda et al.'s mathematical model. I provided the "Revelation: You Already ARE the Huda Paper" analysis with detailed restructuring plan.
+
+5. **User requested full rewrite**: "gọi agents team ra, càng nhiều agents càng tốt" - launch as many agents as possible. "Commit trước rồi bao giờ xong hẳn mới được dừng" - commit first, don't stop until done.
+
+6. **Git commit**: Committed all current work at ba11b46 "chore: snapshot pre-reframe". The ONNX model and notebooks caused some delay.
+
+7. **Created 3 tasks**: Task 1 (rewrite presentation), Task 2 (rewrite report), Task 3 (professor review, blocked by 1 and 2).
+
+8. **User interruption and clarification**: "topic A Vision-First Multi-Modal Approach for Hand Gesture Recognition. Vì đây là topic chung professor yêu cầu" - the title is MANDATORY from the professor. Cannot change it.
+
+9. **Launched 3 parallel agents**:
+   - Agent 1 (cto): Rewrote presentation.tex → 8 slides with state machine tikz, mathematical model equations, backup slides
+   - Agent 2 (cto): Rewrote report.tex → 812 lines, expanded Section 4 (mathematical model) to 206 lines as the longest section
+   - Agent 3 (brainstormer): Professor critique → saved to professor_critique.md, grade B+ (borderline A-)
+
+10. **User's latest message** (while agents were running): "à mà slide dài tí nhưng hay là được. có 15 phút trình bày" - slides can be a bit longer as long as they're good, have 15 minutes to present.
+
+Key findings from professor critique agent:
+- Frame gesture bypass (gesture.js:253-258) uses two-hand heuristic, not MLP
+- No quantitative evaluation of the interaction model
+- 100% accuracy needs contextualization
+- No statistical significance testing
+- Pipeline figure shows dual-stream but deployed system is MLP-only
+
+Summary:
+1. Primary Request and Intent:
+   The user (Vietnamese CS student) has a CV course project on hand gesture recognition with the **professor-mandated topic**: "A Vision-First Multi-Modal Approach for Hand Gesture Recognition". The project has 6 methods (Heuristic, RF, MLP, CNN, YOLOv8n, Fusion) on 5 HaGRID classes all achieving ~100% accuracy — making the comparison look academically weak. The user wants to completely restructure both the presentation (for a 15-minute talk) and report to be more like the Huda et al. (PLOS ONE 2025) paper — an application-centric paper rather than a comparison paper. The user explicitly requested: (1) commit current state, (2) launch multiple agents to debate and reframe, (3) don't stop until done, (4) the professor must give a high grade. The user also clarified slides can be longer as long as they're good quality ("slide dài tí nhưng hay là được").
+
+2. Key Technical Concepts:
+   - **6 classification methods**: Heuristic (0.99%), Random Forest (94.1%), MLP (99.8%, 14.7K params, 227KB), CNN/MobileNetV3-Small (100.0%), YOLOv8n (99.5% mAP@50), Weighted Average Fusion (100.0%)
+   - **Person-aware Group 5-Fold Cross-Validation** using subject IDs (GroupKFold)
+   - **HaGRID v2 dataset**: 23,850 samples, 13,250 subjects, 5 classes (open_hand, fist, pinch, frame, none)
+   - **Dual-stream architecture**: Skeleton (MediaPipe 60D landmarks → MLP) + Appearance (224×224 crops → MobileNetV3-Small CNN)
+   - **Ceiling effect / modality saturation**: Both modalities independently achieve near-perfect accuracy
+   - **Grid-based swipe mathematical model** (adapted from Huda et al. 2025): movement thresholds (mov_x=0.6*tile_w, mov_y=0.6*tile_h), tolerance zone (tol=0.3*min(w,h)), directional conditions
+   - **State machine**: IDLE → GRABBING → FIST_HOLD with 3-frame debounce buffer
+   - **Smoothed cursor**: Adaptive alpha EMA (alpha=1.0 for large movements, 0.4 for small)
+   - **ONNX browser deployment**: Client-side inference via ONNX Runtime Web + MediaPipe WASM
+   - **Reference papers**: Huda et al. (PLOS ONE 2025, wheelchair control), Al Farid et al. (J. Imaging 2022, survey), Nguyen et al. (Electronics 2025, YOLOv8n wheelchair)
+
+3. Files and Code Sections:
+   - **`/Users/hieudinh/Documents/my-projects/CVsubject/outputs/presentation.tex`**
+     - Originally 13 slides (410 lines), REWRITTEN by agent to 8 main slides + 3 backup slides
+     - New structure: Title → Problem & Motivation → Dataset & Eval → Multi-Modal Classification → Mathematical Model (CORE) → System Architecture → Conclusion → Thank You + Demo
+     - Mathematical model slide includes: TikZ state machine automaton, debounce equation, grid-swipe equations with thresholds, tolerance zone diagram, conditions table
+     - Backup slides: full 6-method table, confusion matrices, preprocessing pipeline
+   
+   - **`/Users/hieudinh/Documents/my-projects/CVsubject/outputs/report.tex`**
+     - Originally 668 lines, REWRITTEN by agent to 812 lines
+     - New structure: Intro (vision-first defined, 3 RQs, 3 contributions) → Data Prep → Multi-Modal Classification (consolidated methods+results) → Mathematical Model for Interactive Control (206 lines, LONGEST section) → System Architecture → Discussion & Conclusion
+     - Section 4 expanded with: classification-to-control gap, gesture-to-action mapping, grid-based swipe model equations, finite state machine with TikZ diagram, smoothed cursor with adaptive alpha, comparison table (Huda vs Nguyen vs Ours)
+   
+   - **`/Users/hieudinh/Documents/my-projects/CVsubject/outputs/professor_critique.md`**
+     - NEW file created by brainstormer agent — professor's critical review
+     - Grade: B+ (borderline A-)
+     - Key issues: frame-bypass inconsistency, no quantitative eval of interaction model, 100% accuracy needs contextualization, no statistical significance testing, pipeline figure vs deployed system mismatch
+     - Contains top 7 Q&A questions and path to A grade
+   
+   - **`/Users/hieudinh/Documents/my-projects/CVsubject/game/gesture.js`** (654 lines)
+     - GestureController class with MediaPipe + ONNX MLP + optional CNN fusion
+     - `_preprocessLandmarks()`: wrist-relative translation + scale normalization → 60D vector
+     - `_classifyGesture()`: heuristic fallback using finger extension checks
+     - `_fusedPredict()`: weighted average fusion (alpha=0.7 for MLP)
+     - Two-hand frame bypass at lines 253-258 (flagged by professor critique as undisclosed)
+   
+   - **`/Users/hieudinh/Documents/my-projects/CVsubject/game/main.js`** (882 lines)
+     - Full game controller with state machine at lines 651-728
+     - **Grid-based swipe model** at lines 677-718: `movX = tileW * 0.6`, `movY = tileH * 0.6`, `tol = min(tileW, tileH) * 0.3`
+     - State transitions: IDLE→GRABBING (on stable pinch over tile), GRABBING→IDLE (on open_hand/none), FIST_HOLD (for reset)
+     - Debounce buffer: `GESTURE_DEBOUNCE = 3`, `getStableGesture()` requires N consecutive same predictions
+     - Smoothed cursor: adaptive alpha based on movement distance
+     - Comment at line 677: "// Implement Huda et al. Mathematical Model (Grid-based Swipe)"
+
+4. Errors and fixes:
+   - **Git commit timeout**: The initial `git add && git commit` command ran in background and timed out twice (30s, 60s, 120s). Checked output file (empty), checked file sizes (cnn_model.onnx was only 287KB, notebooks 1.4M, outputs 7.9M). Eventually confirmed commit succeeded by running `git status` (empty) and `git log` (showed new commit ba11b46).
+   - **No code errors in this session** — all work was agent-delegated file rewrites.
+
+5. Problem Solving:
+   - **Core problem**: 6 methods all achieving ~100% makes the comparison paper narrative absurd
+   - **Solution**: Reframe from comparison paper to application paper. The mathematical model (game/main.js:677-718) becomes the central contribution. The multi-modal comparison becomes supporting evidence with an honest negative result (ceiling effect = boundary condition finding)
+   - **Title constraint**: Professor mandates "A Vision-First Multi-Modal Approach for Hand Gesture Recognition" — solved by defining "vision-first" = start with cheapest signal (skeleton), add appearance only if needed
+   - **Professor critique identified issues** still to address: frame-bypass disclosure, no quantitative interaction model evaluation, pipeline figure inconsistency
+
+6. All user messages:
+   - (From compacted context) "hi"
+   - (From compacted context) Review request in Vietnamese about project alignment
+   - (From compacted context) "actually all is here" pointing to outputs/
+   - (From compacted context) "Vậy giờ nên làm lại như nào nhỉ" 
+   - (From compacted context) "sao tôi có cảm giác bài này không đủ cạnh tranh"
+   - (From compacted context) Shared 3 paper URLs + "/brainstorm"
+   - (Brainstorm skill invocation) "có thể cân nhắc xoá bỏ 1 số phần, để phần trình bày được ngắn gọn súc tích, tập trung hơn. Hãy tham khảo thêm về paper 1 lần nữa" + full Huda et al. paper text
+   - "kiểu nó đều cao như nhau nên thấy so sánh rất buồn cười, /brainstorm lại làm tương tự như paper trên nhưng áp dung vào game xếp hình của chúng ta được không?"
+   - "Bây giờ này, gọi agents team ra, càng nhiều agents càng tốt. Debate và reframe lại bài này một cách hợp lý và chuẩn chỉ cho việc trình bày. Đọc xong professor phải cho điểm cao luôncho topic A Vision-First Multi-Modal Approach for Hand Gesture Recognition. Commit trước rồi bao giờ xong hẳn mới được dừng"
+   - "tiếp tục lại đi, Debate và reframe lại bài này một cách hợp lý và chuẩn chỉ cho việc trình bày. Đọc xong professor phải cho điểm cao luôncho topic A Vision-First Multi-Modal Approach for Hand Gesture Recognition. Vì đây là topic chung professor yêu cầu"
+   - "à mà slide dài tí nhưng hay là được. có 15 phút trình bày"
+
+7. Pending Tasks:
+   - **Task 3 (Critical review)**: Professor critique was completed and saved to professor_critique.md. The issues identified need to be addressed in the rewritten files.
+   - **Address professor critique issues**: (1) Disclose frame-bypass in report/presentation, (2) Add quantitative evaluation of interaction model or acknowledge as limitation, (3) Fix pipeline figure inconsistency, (4) Add statistical significance discussion
+   - **Verify rewritten files compile**: Need to check that the new presentation.tex and report.tex actually compile with pdflatex/xelatex
+   - **User's latest message**: Slides can be longer if they're good — validate the new presentation length is appropriate for 15 minutes
+
+8. Current Work:
+   Three parallel agents just completed:
+   - Agent a69f917: Rewrote `outputs/presentation.tex` to 8 main slides + 3 backup slides with new application-centric narrative
+   - Agent a19ba06: Rewrote `outputs/report.tex` to 812 lines with expanded mathematical model section (Section 4, 206 lines)
+   - Agent a0ace18: Created `outputs/professor_critique.md` with B+ grade assessment and specific improvement recommendations
+
+   The user's most recent message was: "à mà slide dài tí nhưng hay là được. có 15 phút trình bày" (slides can be a bit longer as long as they're good, have 15 minutes).
+
+9. Optional Next Step:
+   The user said "bao giờ xong hẳn mới được dừng" (don't stop until completely done). The three agents have completed their work. Next steps should be:
+   1. Read the rewritten `outputs/presentation.tex` and `outputs/report.tex` to verify quality
+   2. Read `outputs/professor_critique.md` for the specific issues to fix
+   3. Address the critique issues (frame-bypass disclosure, pipeline figure inconsistency, etc.) in both files
+   4. The user confirmed slides can be longer — validate the slide count is appropriate for 15 minutes
+   5. Commit the final versions
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/hieudinh/.REDACTED.jsonl
+Please continue the conversation from where we left it off without asking the user any further questions. Continue with the last task that you were asked to work on.
