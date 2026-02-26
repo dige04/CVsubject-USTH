@@ -5,7 +5,9 @@
   "branch": "master",
   "checkpoints_count": 3,
   "files_touched": [
+    "cnn_model.onnx",
     "game/gesture.js",
+    "game/main.js",
     "ml/cnn.py",
     "ml/fusion.py",
     "ml/requirements.txt",
@@ -16,11 +18,14 @@
     "ml/scripts/extract_crops.py",
     "ml/scripts/extract_landmarks.py",
     "ml/scripts/generate_splits.py",
+    "ml/scripts/prepare_yolo_data.py",
     "ml/scripts/train_cnn.py",
     "ml/scripts/train_yolo.py",
     "ml/scripts/unified_evaluation.py",
     "ml/scripts/yolo_group_kfold.py",
+    "notebooks/full_pipeline (trained).ipynb",
     "notebooks/full_pipeline.ipynb",
+    "outputs/gesture_mapping.png",
     "outputs/presentation.pdf",
     "outputs/presentation.tex",
     "outputs/presentation_preview-01.png",
@@ -65,6 +70,13 @@
     "outputs/report_preview-08.png",
     "outputs/report_preview-09.png",
     "outputs/report_preview-10.png",
+    "outputs/sota-research-report.md",
+    "papers/Developing_a_real-time_hand-gesture_recognition_te.pdf",
+    "papers/electronics-14-00734.pdf",
+    "papers/extracted_methodology.txt",
+    "papers/jimaging-08-00153.pdf",
+    "papers/methodology.txt",
+    "papers/temp.txt",
     "presentation-plan-multimodal.md"
   ],
   "sessions": [
@@ -88,13 +100,20 @@
       "context": "/d4/8429a40eba/2/context.md",
       "content_hash": "/d4/8429a40eba/2/content_hash.txt",
       "prompt": "/d4/8429a40eba/2/prompt.txt"
+    },
+    {
+      "metadata": "/d4/8429a40eba/3/metadata.json",
+      "transcript": "/d4/8429a40eba/3/full.jsonl",
+      "context": "/d4/8429a40eba/3/context.md",
+      "content_hash": "/d4/8429a40eba/3/content_hash.txt",
+      "prompt": "/d4/8429a40eba/3/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 13181566,
+    "input_tokens": 16284324,
     "cache_creation_tokens": 0,
     "cache_read_tokens": 0,
-    "output_tokens": 1548,
-    "api_call_count": 133
+    "output_tokens": 1771,
+    "api_call_count": 166
   }
 }
