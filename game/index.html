@@ -9,83 +9,86 @@
 <body>
   <div class="app">
 
-    <!-- Title bar -->
-    <div class="title-bar">
-      <span class="course-badge">Computer Vision</span>
-      <h1 class="title">Live Puzzle</h1>
-      <p class="subtitle">Frame it to Snap. Pinch &amp; Drag to Swap.</p>
-    </div>
-
-    <!-- Full-screen game canvas -->
-    <canvas id="game-canvas"></canvas>
-
-    <!-- Hidden video for camera feed -->
-    <video id="webcam" autoplay playsinline muted></video>
-
-    <!-- Timer HUD (top-center, visible during PLAYING) -->
-    <div id="hud-timer" class="hud-timer hidden">
-      <span class="timer-icon">&#9201;</span>
-      <span id="timer-value" class="timer-value">0:00</span>
-    </div>
-
-    <!-- Leaderboard button (top-left, visible during SCANNING) -->
-    <button id="btn-show-leaderboard" class="btn-show-leaderboard">
-      &#9776; Leaderboard
-    </button>
-
-    <!-- Instructions (top-right) -->
-    <div id="instructions" class="instructions-box">
-      <div id="instructions-content">
-        <p class="instr-phase">PHASE 1: CAPTURE</p>
-        <p>1. Form a frame with two hands</p>
-        <p>2. Pinch both hands to SNAP</p>
+    <!-- Onboard screen -->
+    <div id="onboard-screen" class="onboard-screen">
+      <div class="onboard-card">
+        <span class="course-badge">Computer Vision</span>
+        <h1 class="onboard-title">Live Puzzle</h1>
+        <p class="onboard-sub">Frame it to Snap. Pinch &amp; Drag to Swap.</p>
+        <button id="btn-start" class="btn-start">Start Game</button>
+        <p class="onboard-note">Camera access required</p>
       </div>
     </div>
 
-    <!-- Reset button (bottom-left, visible during PLAYING) -->
-    <button id="btn-reset" class="btn-reset hidden" title="Reset Game">&#8634;</button>
+    <!-- Game screen -->
+    <div id="game-screen" class="game-screen hidden">
 
-    <!-- Hand hint (bottom-right, visible during PLAYING) -->
-    <div id="hand-hint" class="hand-hint hidden">
-      &#9995; Use Index+Thumb Pinch
-    </div>
-
-    <!-- Loading: camera -->
-    <div id="loading-camera" class="loading-overlay">
-      <div class="spinner"></div>
-      <p>Initializing Camera...</p>
-    </div>
-
-    <!-- Loading: AI model -->
-    <div id="loading-ai" class="loading-ai hidden">
-      <div class="spinner-small"></div>
-      <span>Loading AI...</span>
-    </div>
-
-    <!-- Error overlay -->
-    <div id="error-overlay" class="error-overlay hidden">
-      <p class="error-title">Error</p>
-      <p id="error-message"></p>
-    </div>
-
-    <!-- Solved overlay -->
-    <div id="solved-overlay" class="solved-overlay hidden">
-      <div class="solved-content">
-        <div class="trophy">&#127942;</div>
-        <h2 class="solved-heading">COMPLETE!</h2>
-        <div class="solved-time-row">
-          <span class="solved-time-icon">&#9201;</span>
-          <span id="solved-time" class="solved-time-value">0:00</span>
+      <!-- Header bar -->
+      <div class="header-bar">
+        <div class="header-left">
+          <span class="badge-sm">CV</span>
+          <span class="header-title">Live Puzzle</span>
         </div>
-        <div class="solved-form">
-          <p class="solved-hint">Enter your name for the leaderboard</p>
-          <div class="solved-input-row">
+        <div id="hud-timer" class="hud-timer hidden">
+          <span class="timer-icon">&#9201;</span>
+          <span id="timer-value" class="timer-value">0:00</span>
+        </div>
+        <div class="header-right">
+          <button id="btn-show-leaderboard" class="btn-header">&#9776; Leaderboard</button>
+          <button id="btn-reset" class="btn-header hidden" title="Reset Game">&#8634; Reset</button>
+        </div>
+      </div>
+
+      <!-- Canvas area -->
+      <div class="canvas-wrapper">
+        <canvas id="game-canvas"></canvas>
+        <video id="webcam" autoplay playsinline muted></video>
+
+        <!-- Loading: camera -->
+        <div id="loading-camera" class="loading-overlay">
+          <div class="spinner"></div>
+          <p>Initializing Camera...</p>
+        </div>
+
+        <!-- Loading: AI model -->
+        <div id="loading-ai" class="loading-ai hidden">
+          <div class="spinner-small"></div>
+          <span>Loading AI...</span>
+        </div>
+
+        <!-- Error overlay -->
+        <div id="error-overlay" class="error-overlay hidden">
+          <p class="error-title">Error</p>
+          <p id="error-message"></p>
+        </div>
+      </div>
+
+      <!-- Footer bar -->
+      <div class="footer-bar">
+        <!-- Instructions (visible during SCANNING / PLAYING) -->
+        <div id="instructions" class="instructions-bar">
+          <span id="instructions-content">
+            <span class="instr-phase">PHASE 1: CAPTURE</span>
+            <span>Form a frame with two hands, pinch to snap</span>
+          </span>
+        </div>
+
+        <!-- Solved bar (visible during SOLVED) -->
+        <div id="solved-bar" class="solved-bar hidden">
+          <div class="solved-info">
+            <span class="solved-trophy">&#127942;</span>
+            <span class="solved-label">COMPLETE!</span>
+            <span class="solved-time-icon">&#9201;</span>
+            <span id="solved-time" class="solved-time-value">0:00</span>
+          </div>
+          <div class="solved-actions">
             <input type="text" id="player-name" class="input-name" placeholder="YOUR NAME" maxlength="10" autocomplete="off">
             <button id="btn-submit-score" class="btn-submit" title="Submit">&rarr;</button>
+            <button id="btn-skip" class="btn-skip">Skip</button>
           </div>
         </div>
-        <button id="btn-skip" class="btn-skip">Skip &amp; Play Again</button>
       </div>
+
     </div>
 
     <!-- Leaderboard overlay -->

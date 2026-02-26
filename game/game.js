@@ -74,9 +74,9 @@ const SwapPuzzle = {
         ctx.save();
         ctx.globalAlpha = 0.5;
         ctx.drawImage(image, sx, sy, srcTileW, srcTileH, dx, dy, tileW, tileH);
-        ctx.fillStyle = 'rgba(204, 255, 0, 0.2)';
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.2)';
         ctx.fillRect(dx, dy, tileW, tileH);
-        ctx.strokeStyle = '#ccff00';
+        ctx.strokeStyle = '#38bdf8';
         ctx.lineWidth = 2;
         ctx.strokeRect(dx, dy, tileW, tileH);
         ctx.restore();
@@ -104,7 +104,7 @@ const SwapPuzzle = {
       ctx.shadowBlur = 15;
       ctx.shadowOffsetY = 10;
       ctx.drawImage(image, sx, sy, srcTileW, srcTileH, ddx, ddy, dragW, dragH);
-      ctx.strokeStyle = '#ccff00';
+      ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 2;
       ctx.strokeRect(ddx, ddy, dragW, dragH);
       ctx.restore();

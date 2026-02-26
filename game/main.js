@@ -18,6 +18,7 @@
   const RESET_DWELL_MS = 1500;
   const ROWS = 3;
   const COLS = 3;
+  const ACCENT = '#38bdf8';
 
   // Hand skeleton connection pairs
   const HAND_CONNECTIONS = [
@@ -65,13 +66,18 @@
   const ctx = canvas.getContext('2d');
   const video = document.getElementById('webcam');
 
+  // Onboard
+  const onboardScreen = document.getElementById('onboard-screen');
+  const gameScreen = document.getElementById('game-screen');
+  const btnStart = document.getElementById('btn-start');
+
   // HUD
   const hudTimer = document.getElementById('hud-timer');
   const timerValue = document.getElementById('timer-value');
   const btnShowLeaderboard = document.getElementById('btn-show-leaderboard');
+  const instructionsDiv = document.getElementById('instructions');
   const instructionsContent = document.getElementById('instructions-content');
   const btnReset = document.getElementById('btn-reset');
-  const handHint = document.getElementById('hand-hint');
 
   // Loading / Error
   const loadingCamera = document.getElementById('loading-camera');
@@ -79,8 +85,8 @@
   const errorOverlay = document.getElementById('error-overlay');
   const errorMessage = document.getElementById('error-message');
 
-  // Solved overlay
-  const solvedOverlay = document.getElementById('solved-overlay');
+  // Solved bar
+  const solvedBar = document.getElementById('solved-bar');
   const solvedTime = document.getElementById('solved-time');
   const playerNameInput = document.getElementById('player-name');
   const btnSubmitScore = document.getElementById('btn-submit-score');
@@ -164,38 +170,36 @@
     // Leaderboard button
     btnShowLeaderboard.classList.toggle('hidden', gameState !== 'SCANNING');
 
-    // Reset button & hand hint
+    // Reset button
     btnReset.classList.toggle('hidden', gameState !== 'PLAYING');
-    handHint.classList.toggle('hidden', gameState !== 'PLAYING');
+
+    // Instructions vs Solved bar
+    instructionsDiv.classList.toggle('hidden', gameState === 'SOLVED');
+    solvedBar.classList.toggle('hidden', gameState !== 'SOLVED');
 
     // Loading
     loadingCamera.classList.toggle('hidden', cameraReady);
     loadingAi.classList.toggle('hidden', modelLoaded || !cameraReady);
 
-    // Instructions
-    updateInstructions();
+    // Instructions content
+    if (gameState !== 'SOLVED') {
+      updateInstructions();
+    }
   }
 
   function updateInstructions() {
     let html = '';
     switch (gameState) {
       case 'SCANNING':
-        html = '<p class="instr-phase">PHASE 1: CAPTURE</p>' +
-               '<p>1. Form a frame with two hands</p>' +
-               '<p>2. Pinch both hands to SNAP</p>';
+        html = '<span class="instr-phase">PHASE 1: CAPTURE</span>' +
+               '<span>Form a frame with two hands, pinch to snap</span>';
         break;
       case 'PLAYING':
-        html = '<p class="instr-phase">PHASE 2: SOLVE</p>' +
-               '<p>1. Pinch to Pick Up</p>' +
-               '<p>2. Drag & Drop to Swap</p>' +
-               '<p style="color:var(--accent);margin-top:6px">Hold Fist to Reset</p>';
+        html = '<span class="instr-phase">PHASE 2: SOLVE</span>' +
+               '<span>Pinch to Pick Up &middot; Drag & Drop to Swap &middot; Hold Fist to Reset</span>';
         break;
-      case 'SOLVED':
-        html = '<p class="instr-phase">PUZZLE SOLVED!</p>';
-        break;
-      case 'LEADERBOARD':
-        html = '<p class="instr-phase">TOP PLAYERS</p>';
-        break;
+      default:
+        html = '';
     }
     instructionsContent.innerHTML = html;
   }
@@ -270,7 +274,7 @@
     timeElapsed = 0;
     startTime = null;
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-    solvedOverlay.classList.add('hidden');
+    solvedBar.classList.add('hidden');
     leaderboardOverlay.classList.add('hidden');
     updateUI();
   }
@@ -289,11 +293,10 @@
     gameState = 'SOLVED';
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
     solvedTime.textContent = formatTime(timeElapsed);
-    solvedOverlay.classList.remove('hidden');
 
     const savedName = getSavedName();
     if (savedName) playerNameInput.value = savedName;
-    playerNameInput.focus();
+    setTimeout(() => playerNameInput.focus(), 100);
 
     updateUI();
   }
@@ -306,7 +309,7 @@
     setPersonalBest(timeElapsed);
     addEntry(name, timeElapsed);
 
-    solvedOverlay.classList.add('hidden');
+    solvedBar.classList.add('hidden');
     showLeaderboard();
   }
 
@@ -362,7 +365,6 @@
   }
 
   function isFrameGesture(hand) {
-    // Thumb and index spread apart
     return Math.hypot(hand[8].x - hand[4].x, hand[8].y - hand[4].y) > FRAME_THRESHOLD;
   }
 
@@ -386,7 +388,6 @@
   // ---------------------------------------------------------------
   function drawSkeleton(allLandmarks, width, height) {
     for (const landmarks of allLandmarks) {
-      // Draw connections
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 3;
       for (const [a, b] of HAND_CONNECTIONS) {
@@ -395,7 +396,6 @@
         ctx.lineTo((1 - landmarks[b].x) * width, landmarks[b].y * height);
         ctx.stroke();
       }
-      // Draw joints
       for (let i = 0; i < landmarks.length; i++) {
         const lm = landmarks[i];
         ctx.beginPath();
@@ -450,8 +450,8 @@
       }
     }
 
-    // ---- PLAYING / SOLVED ----
-    else if ((gameState === 'PLAYING' || gameState === 'SOLVED') && puzzleImageCanvas && boardCoords) {
+    // ---- PLAYING ----
+    else if (gameState === 'PLAYING' && puzzleImageCanvas && boardCoords) {
       // Draw mirrored camera background
       ctx.save();
       ctx.translate(width, 0);
@@ -462,8 +462,35 @@
       handlePlaying(results, width, height);
     }
 
-    // Draw skeleton (except during leaderboard)
-    if (results && results.landmarks && results.landmarks.length > 0 && gameState !== 'LEADERBOARD') {
+    // ---- SOLVED - show completed image for admiration ----
+    else if (gameState === 'SOLVED' && puzzleImageCanvas) {
+      // Dark background
+      ctx.fillStyle = '#09090b';
+      ctx.fillRect(0, 0, width, height);
+
+      // Draw completed puzzle centered
+      const imgW = puzzleImageCanvas.width;
+      const imgH = puzzleImageCanvas.height;
+      const scale = Math.min(width * 0.85 / imgW, height * 0.85 / imgH);
+      const drawW = imgW * scale;
+      const drawH = imgH * scale;
+      const dx = (width - drawW) / 2;
+      const dy = (height - drawH) / 2;
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(56, 189, 248, 0.3)';
+      ctx.shadowBlur = 40;
+      ctx.drawImage(puzzleImageCanvas, dx, dy, drawW, drawH);
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = ACCENT;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(dx, dy, drawW, drawH);
+      ctx.restore();
+    }
+
+    // Draw skeleton (not during LEADERBOARD or SOLVED)
+    if (results && results.landmarks && results.landmarks.length > 0
+        && gameState !== 'LEADERBOARD' && gameState !== 'SOLVED') {
       drawSkeleton(results.landmarks, width, height);
     }
 
@@ -475,7 +502,7 @@
   // ---------------------------------------------------------------
   function handleScanning(results, width, height) {
     if (!results || !results.landmarks || results.landmarks.length < 2) {
-      lastFrameCoords = null; // Clear stale frame when fewer than 2 hands
+      lastFrameCoords = null;
       return;
     }
 
@@ -517,7 +544,7 @@
       const sy = c.minY * height;
       const ey = c.maxY * height;
 
-      ctx.strokeStyle = '#ccff00';
+      ctx.strokeStyle = ACCENT;
       ctx.lineWidth = 4;
       ctx.strokeRect(sx, sy, ex - sx, ey - sy);
 
@@ -608,17 +635,15 @@
       }
     }
 
-    // Drag & drop logic (only during PLAYING)
+    // Drag & drop logic
     if (gameState === 'PLAYING') {
       if (pinching) {
         if (!isDragging && hoverIndex !== null) {
-          // Start drag
           isDragging = true;
           dragTileIndex = hoverIndex;
         }
       } else {
         if (isDragging) {
-          // Drop - swap tiles
           if (dragTileIndex !== null && hoverIndex !== null && dragTileIndex !== hoverIndex) {
             [tiles[dragTileIndex], tiles[hoverIndex]] = [tiles[hoverIndex], tiles[dragTileIndex]];
             if (SwapPuzzle.isSolved(tiles)) {
@@ -657,10 +682,10 @@
       ctx.beginPath();
       ctx.arc(cursorX, cursorY, 10, 0, Math.PI * 2);
       if (isDragging) {
-        ctx.fillStyle = '#ccff00';
+        ctx.fillStyle = ACCENT;
         ctx.fill();
       } else {
-        ctx.strokeStyle = '#ccff00';
+        ctx.strokeStyle = ACCENT;
         ctx.lineWidth = 2;
         ctx.stroke();
       }
@@ -691,7 +716,7 @@
 
       ctx.beginPath();
       ctx.arc(cx, cy, 50, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
-      ctx.strokeStyle = '#ccff00';
+      ctx.strokeStyle = ACCENT;
       ctx.lineWidth = 6;
       ctx.lineCap = 'round';
       ctx.stroke();
@@ -716,6 +741,18 @@
   // ---------------------------------------------------------------
   // Button event handlers
   // ---------------------------------------------------------------
+  btnStart.addEventListener('click', async () => {
+    onboardScreen.classList.add('hidden');
+    gameScreen.classList.remove('hidden');
+
+    await startCamera();
+    if (!cameraReady) return;
+
+    await initDetection();
+
+    requestAnimationFrame(renderLoop);
+  });
+
   btnShowLeaderboard.addEventListener('click', () => {
     showLeaderboard();
   });
@@ -733,7 +770,6 @@
   });
 
   btnSkip.addEventListener('click', () => {
-    solvedOverlay.classList.add('hidden');
     resetGame();
   });
 
@@ -745,17 +781,9 @@
   // ---------------------------------------------------------------
   // Bootstrap
   // ---------------------------------------------------------------
-  async function init() {
+  function init() {
+    // Show onboard screen, wait for Start button
     updateUI();
-
-    // Start camera first, then detection
-    await startCamera();
-    if (!cameraReady) return;
-
-    await initDetection();
-
-    // Start render loop
-    requestAnimationFrame(renderLoop);
   }
 
   init();
