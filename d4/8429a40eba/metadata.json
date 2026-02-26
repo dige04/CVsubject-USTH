@@ -3,7 +3,7 @@
   "checkpoint_id": "d48429a40eba",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 2,
+  "checkpoints_count": 3,
   "files_touched": [
     "game/gesture.js",
     "ml/cnn.py",
@@ -14,6 +14,7 @@
     "ml/scripts/convert_to_yolo.py",
     "ml/scripts/download_hagrid.py",
     "ml/scripts/extract_crops.py",
+    "ml/scripts/extract_landmarks.py",
     "ml/scripts/generate_splits.py",
     "ml/scripts/train_cnn.py",
     "ml/scripts/train_yolo.py",
@@ -80,13 +81,20 @@
       "context": "/d4/8429a40eba/1/context.md",
       "content_hash": "/d4/8429a40eba/1/content_hash.txt",
       "prompt": "/d4/8429a40eba/1/prompt.txt"
+    },
+    {
+      "metadata": "/d4/8429a40eba/2/metadata.json",
+      "transcript": "/d4/8429a40eba/2/full.jsonl",
+      "context": "/d4/8429a40eba/2/context.md",
+      "content_hash": "/d4/8429a40eba/2/content_hash.txt",
+      "prompt": "/d4/8429a40eba/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 10049789,
+    "input_tokens": 13181566,
     "cache_creation_tokens": 0,
     "cache_read_tokens": 0,
-    "output_tokens": 1251,
-    "api_call_count": 106
+    "output_tokens": 1548,
+    "api_call_count": 133
   }
 }

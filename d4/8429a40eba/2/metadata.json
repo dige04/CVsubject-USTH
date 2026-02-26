@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "d48429a40eba",
+  "session_id": "4a68979d-e1c5-4a09-bc75-ea785533305f",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-26T09:24:28.511802Z",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "ml/scripts/download_hagrid.py",
+    "ml/scripts/extract_landmarks.py"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "3028a1e00b2a",
+  "transcript_identifier_at_start": "462d55db-77d2-4c1a-ad62-9ae7e68103f2",
+  "token_usage": {
+    "input_tokens": 3131777,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 297,
+    "api_call_count": 27
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-26T09:24:27.754042Z",
+    "agent_lines": 560,
+    "human_added": 33112,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 33672,
+    "agent_percentage": 1.663102874792112
+  },
+  "transcript_path": ".claude/projects/-Users-hieudinh-Documents-my-projects-CVsubject/4a68979d-e1c5-4a09-bc75-ea785533305f.jsonl"
+}
