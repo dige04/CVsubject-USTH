@@ -3,7 +3,7 @@
   "checkpoint_id": "d48429a40eba",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
     "game/gesture.js",
     "ml/cnn.py",
@@ -19,7 +19,52 @@
     "ml/scripts/train_yolo.py",
     "ml/scripts/unified_evaluation.py",
     "ml/scripts/yolo_group_kfold.py",
-    "notebooks/full_pipeline.ipynb"
+    "notebooks/full_pipeline.ipynb",
+    "outputs/presentation.pdf",
+    "outputs/presentation.tex",
+    "outputs/presentation_preview-01.png",
+    "outputs/presentation_preview-02.png",
+    "outputs/presentation_preview-03.png",
+    "outputs/presentation_preview-04.png",
+    "outputs/presentation_preview-05.png",
+    "outputs/presentation_preview-06.png",
+    "outputs/presentation_preview-07.png",
+    "outputs/presentation_preview-08.png",
+    "outputs/presentation_preview-09.png",
+    "outputs/presentation_preview-10.png",
+    "outputs/presentation_preview-11.png",
+    "outputs/presentation_preview-12.png",
+    "outputs/presentation_preview-13.png",
+    "outputs/presentation_preview-14.png",
+    "outputs/presentation_preview-15.png",
+    "outputs/presentation_preview-16.png",
+    "outputs/presentation_preview-17.png",
+    "outputs/presentation_preview-18.png",
+    "outputs/presentation_preview-19.png",
+    "outputs/presentation_preview-20.png",
+    "outputs/presentation_preview-21.png",
+    "outputs/presentation_preview-22.png",
+    "outputs/presentation_preview-23.png",
+    "outputs/presentation_preview-24.png",
+    "outputs/presentation_preview-25.png",
+    "outputs/presentation_preview-26.png",
+    "outputs/presentation_preview-27.png",
+    "outputs/presentation_preview-28.png",
+    "outputs/presentation_preview-29.png",
+    "outputs/presentation_preview-30.png",
+    "outputs/report.pdf",
+    "outputs/report.tex",
+    "outputs/report_preview-01.png",
+    "outputs/report_preview-02.png",
+    "outputs/report_preview-03.png",
+    "outputs/report_preview-04.png",
+    "outputs/report_preview-05.png",
+    "outputs/report_preview-06.png",
+    "outputs/report_preview-07.png",
+    "outputs/report_preview-08.png",
+    "outputs/report_preview-09.png",
+    "outputs/report_preview-10.png",
+    "presentation-plan-multimodal.md"
   ],
   "sessions": [
     {
@@ -28,13 +73,20 @@
       "context": "/d4/8429a40eba/0/context.md",
       "content_hash": "/d4/8429a40eba/0/content_hash.txt",
       "prompt": "/d4/8429a40eba/0/prompt.txt"
+    },
+    {
+      "metadata": "/d4/8429a40eba/1/metadata.json",
+      "transcript": "/d4/8429a40eba/1/full.jsonl",
+      "context": "/d4/8429a40eba/1/context.md",
+      "content_hash": "/d4/8429a40eba/1/content_hash.txt",
+      "prompt": "/d4/8429a40eba/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 4712286,
+    "input_tokens": 10049789,
     "cache_creation_tokens": 0,
     "cache_read_tokens": 0,
-    "output_tokens": 522,
-    "api_call_count": 44
+    "output_tokens": 1251,
+    "api_call_count": 106
   }
 }
