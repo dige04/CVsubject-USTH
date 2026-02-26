@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "d48429a40eba",
+  "session_id": "fdb900cd-eae6-4ebc-bbf5-4b6fde401364",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-26T09:32:07.776903Z",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "outputs/sota-research-report.md"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "615af8b2bf6d",
+  "transcript_identifier_at_start": "daab7af3-bf11-42cf-83be-1aa3da0ead4a",
+  "token_usage": {
+    "input_tokens": 3963143,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 255,
+    "api_call_count": 35
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-26T09:28:53.373456Z",
+    "agent_lines": 0,
+    "human_added": 32406,
+    "human_modified": 1016,
+    "human_removed": 0,
+    "total_committed": 32656,
+    "agent_percentage": 0
+  },
+  "transcript_path": ".claude/projects/-Users-hieudinh-Documents-my-projects-CVsubject/fdb900cd-eae6-4ebc-bbf5-4b6fde401364.jsonl"
+}

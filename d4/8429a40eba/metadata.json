@@ -3,7 +3,7 @@
   "checkpoint_id": "d48429a40eba",
   "strategy": "manual-commit",
   "branch": "master",
-  "checkpoints_count": 4,
+  "checkpoints_count": 5,
   "files_touched": [
     "cnn_model.onnx",
     "game/gesture.js",
@@ -114,13 +114,20 @@
       "context": "/d4/8429a40eba/4/context.md",
       "content_hash": "/d4/8429a40eba/4/content_hash.txt",
       "prompt": "/d4/8429a40eba/4/prompt.txt"
+    },
+    {
+      "metadata": "/d4/8429a40eba/5/metadata.json",
+      "transcript": "/d4/8429a40eba/5/full.jsonl",
+      "context": "/d4/8429a40eba/5/context.md",
+      "content_hash": "/d4/8429a40eba/5/content_hash.txt",
+      "prompt": "/d4/8429a40eba/5/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 29719600,
+    "input_tokens": 33682743,
     "cache_creation_tokens": 0,
     "cache_read_tokens": 0,
-    "output_tokens": 3039,
-    "api_call_count": 280
+    "output_tokens": 3294,
+    "api_call_count": 315
   }
 }
