@@ -91,19 +91,31 @@
     \vspace{0.5em}
 
     \begin{tikzpicture}[
-        stage/.style={draw=primary, rounded corners=4pt, fill=primary!8, minimum width=2.4cm, minimum height=1.0cm, align=center, font=\small, thick, text=primary!90},
-        arrow/.style={-{Stealth[scale=0.9]}, very thick, primary!50},
-        node distance=0.6cm,
+        stage/.style={draw=primary, rounded corners=4pt, fill=primary!8, minimum width=2cm, minimum height=0.8cm, align=center, font=\small, thick, text=primary!90},
+        arrow/.style={-{Stealth[scale=0.8]}, very thick, primary!50},
+        node distance=0.5cm,
     ]
         \node[stage, fill=gray!10, text=black] (cam) {Webcam\\[-2pt]{\tiny RGB frame}};
-        \node[stage, fill=primary!12, right=of cam] (mp) {MediaPipe\\[-2pt]{\tiny 21 landmarks}};
-        \node[stage, fill=accent!12, text=black, right=of mp] (cls) {Classify\\[-2pt]{\tiny MLP / CNN}};
-        \node[stage, fill=success!12, text=black, right=of cls] (ctrl) {Control\\[-2pt]{\tiny Math model}};
+        \node[stage, fill=primary!12, right=of cam] (mp) {MediaPipe\\[-2pt]{\tiny Detection}};
+
+        % Two paths
+        \node[stage, fill=primary!18, above right=0.3cm and 0.7cm of mp] (lm) {Landmarks\\[-2pt]{\tiny 60D vector}};
+        \node[stage, fill=accent!15, text=black, below right=0.3cm and 0.7cm of mp] (crop) {Hand Crop\\[-2pt]{\tiny 224$\times$224}};
+
+        \node[stage, fill=primary!18, right=of lm] (mlp) {MLP\\[-2pt]{\tiny 227 KB}};
+        \node[stage, fill=accent!15, text=black, right=of crop] (cnn) {CNN\\[-2pt]{\tiny 0.3 MB}};
+
+        % Merge
+        \node[stage, fill=success!12, text=black, right=2.0cm of mp] (ctrl) {Control\\[-2pt]{\tiny Math model}};
         \node[stage, fill=success!20, text=black, right=of ctrl] (game) {Game\\[-2pt]{\tiny Puzzle}};
 
         \draw[arrow] (cam) -- (mp);
-        \draw[arrow] (mp) -- (cls);
-        \draw[arrow] (cls) -- (ctrl);
+        \draw[arrow] (mp) |- (lm);
+        \draw[arrow] (mp) |- (crop);
+        \draw[arrow] (lm) -- (mlp);
+        \draw[arrow] (crop) -- (cnn);
+        \draw[arrow] (mlp) -| (ctrl);
+        \draw[arrow] (cnn) -| (ctrl);
         \draw[arrow] (ctrl) -- (game);
     \end{tikzpicture}
 
@@ -135,29 +147,25 @@
 % SLIDE 3: DATASET (1.5 min)
 % ======================================================================
 \begin{frame}{Dataset: HaGRID v2 --- 5 Gesture Classes}
-\vspace{-0.3em}
-\centering
-\includegraphics[width=0.85\textwidth,height=3cm,keepaspectratio]{hagrid_samples.png}
-
-\vspace{0.3em}
 \begin{columns}[c]
-\begin{column}{0.32\textwidth}
-    \centering
-    \includegraphics[width=\textwidth,height=3.2cm,keepaspectratio]{mediapipe_landmarks.png}
-    {\tiny 21 keypoints $\to$ 60D vector}
-\end{column}
-\begin{column}{0.32\textwidth}
-    \centering
-    \includegraphics[width=\textwidth,height=3.2cm,keepaspectratio]{class_distribution.png}
-    {\tiny 3:1 imbalance (Frame/None)}
-\end{column}
-\begin{column}{0.32\textwidth}
-    \textbf{\small HaGRID v2 Subset:}
-    \begin{itemize}\setlength\itemsep{2pt}
+\begin{column}{0.45\textwidth}
+    \textbf{HaGRID v2 Subset:}
+    \begin{itemize}\setlength\itemsep{4pt}
         \item \textbf{23,850} samples
         \item \textbf{13,250} unique subjects
         \item Person-aware 5-fold CV
     \end{itemize}
+
+    \vspace{0.5em}
+    \centering
+    \includegraphics[width=\textwidth,height=3.5cm,keepaspectratio]{hagrid_samples.png}
+\end{column}
+\begin{column}{0.50\textwidth}
+    \centering
+    \includegraphics[height=4.2cm]{mediapipe_landmarks.png}
+
+    \vspace{0.3em}
+    \includegraphics[width=0.9\textwidth,height=2.8cm,keepaspectratio]{class_distribution.png}
 \end{column}
 \end{columns}
 \end{frame}
@@ -434,14 +442,14 @@
 \begin{frame}{Mathematical Interaction Model (adapted from Huda et al. 2025)}
     \vspace{0.3em}
     \begin{columns}[c]
-    \begin{column}{0.42\textwidth}
+    \begin{column}{0.50\textwidth}
         \centering
-        \includegraphics[width=\textwidth,height=5cm,keepaspectratio]{interaction_model.png}
+        \includegraphics[width=\textwidth]{interaction_model.png}
 
-        \vspace{0.3em}
-        {\scriptsize Huda: wheelchair steering\\Ours: puzzle tile swap}
+        \vspace{0.2em}
+        {\scriptsize Huda: wheelchair steering $\to$ Ours: puzzle tile swap}
     \end{column}
-    \begin{column}{0.54\textwidth}
+    \begin{column}{0.46\textwidth}
         \small
         Let $\Delta x = x_{cur} - x_{init}$,\enspace $\Delta y = y_{cur} - y_{init}$
 

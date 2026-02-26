@@ -211,7 +211,14 @@ none       & \num{7950} & \num{2650} \\
 
 \subsection{Dual-Representation Extraction}
 
-From each image, we extract two parallel representations corresponding to our two modalities:
+From each image, we extract two parallel representations corresponding to our two modalities (\Cref{fig:pipeline}). The key motivation is that skeleton and appearance capture \textbf{complementary information}: skeleton encodes \emph{geometric pose} (joint angles, finger extension) while appearance encodes \emph{visual texture} (skin color, nail shape, background context). Whether their combination yields better recognition than either alone is Research Question~1.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.75\textwidth]{data_pipeline.png}
+\caption{Dual-path feature extraction from a single camera frame. \textbf{Top:} MediaPipe detects 21 hand landmarks, which are normalized into a 60D skeleton vector for the MLP. \textbf{Bottom:} The hand region is cropped using bounding box annotations and resized to $224 \times 224$ for the CNN. Both paths share the same label and person-aware cross-validation split.}
+\label{fig:pipeline}
+\end{figure}
 
 \paragraph{Skeleton landmarks (Modality~1).} MediaPipe HandLandmarker~\citep{mediapipehands2020} extracts 21 three-dimensional hand landmarks per detected hand. The raw 63-dimensional vector ($21 \times 3$) is normalized as follows:
 

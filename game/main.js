@@ -47,11 +47,14 @@
 
   // Interaction
   let smoothCursor = { x: 0, y: 0 };
+  let prevCursor = { x: 0, y: 0 };
   let isDragging = false;
   let dragTileIndex = null;
   let lastPinchTime = 0;
   let lastFrameCoords = null;
   let fistHoldStart = null;
+  let lastHandSeenTime = 0;       // Grace period timestamp
+  const HAND_GRACE_MS = 200;      // Hold gesture for 200ms after hand loss
 
   // Gesture controller
   let gestureCtrl = null;
@@ -572,7 +575,7 @@
   let trackingState = 'IDLE'; // IDLE | GRABBING | FIST_HOLD
   let grabOrigin = null;      // {x, y} when pinch started
   let gestureBuffer = [];     // Last N gesture predictions for debounce
-  const GESTURE_DEBOUNCE = 3; // Frames of consistent gesture to trigger
+  const GESTURE_DEBOUNCE = 4; // Frames of consistent gesture to trigger
   let currentGesture = 'none';
   let currentConfidence = 0;
   let mlpPending = false;     // Prevent overlapping async calls
@@ -606,11 +609,16 @@
       const rawX = (1 - (indexTip.x + thumbTip.x) / 2) * width;
       const rawY = ((indexTip.y + thumbTip.y) / 2) * height;
 
-      // Smooth cursor
+      // Adaptive cursor smoothing — fast for big moves, smooth for small
       const distMove = Math.hypot(rawX - smoothCursor.x, rawY - smoothCursor.y);
-      const alpha = distMove > 100 ? 1.0 : 0.4;
+      const velocity = Math.hypot(rawX - prevCursor.x, rawY - prevCursor.y);
+      prevCursor = { x: rawX, y: rawY };
+      // High velocity → alpha near 1 (responsive), low → alpha ~0.3 (smooth)
+      const alpha = Math.min(1.0, 0.25 + Math.min(velocity / 80, 0.75));
       smoothCursor.x = smoothCursor.x * (1 - alpha) + rawX * alpha;
       smoothCursor.y = smoothCursor.y * (1 - alpha) + rawY * alpha;
+
+      lastHandSeenTime = performance.now();
 
       // Run MLP classification (async, non-blocking)
       if (!mlpPending && gestureCtrl && gestureCtrl.session) {
@@ -624,13 +632,16 @@
         }).catch(() => { mlpPending = false; });
       }
     } else {
-      // No hand — reset to idle
-      gestureBuffer = [];
-      currentGesture = 'none';
-      if (trackingState === 'GRABBING') {
-        isDragging = false;
-        dragTileIndex = null;
-        trackingState = 'IDLE';
+      // No hand — grace period before resetting
+      const timeSinceLast = performance.now() - lastHandSeenTime;
+      if (timeSinceLast > HAND_GRACE_MS) {
+        gestureBuffer = [];
+        currentGesture = 'none';
+        if (trackingState === 'GRABBING') {
+          isDragging = false;
+          dragTileIndex = null;
+          trackingState = 'IDLE';
+        }
       }
     }
 
