@@ -1,0 +1,39 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "4b9e97d5b38e",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "models/plots/accuracy_comparison.png",
+    "models/plots/per_class_f1_comparison.png",
+    "outputs/accuracy_comparison.png",
+    "outputs/game_capture.png",
+    "outputs/game_screenshot.png",
+    "outputs/multimodal_comparison.png",
+    "outputs/per_class_f1_comparison.png",
+    "outputs/pipeline_overview.png",
+    "outputs/presentation.pdf",
+    "outputs/presentation.tex",
+    "outputs/report.pdf",
+    "outputs/report.tex",
+    "outputs/script_vi.md",
+    "outputs/system_architecture.png"
+  ],
+  "sessions": [
+    {
+      "metadata": "/4b/9e97d5b38e/0/metadata.json",
+      "transcript": "/4b/9e97d5b38e/0/full.jsonl",
+      "context": "/4b/9e97d5b38e/0/context.md",
+      "content_hash": "/4b/9e97d5b38e/0/content_hash.txt",
+      "prompt": "/4b/9e97d5b38e/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 4712286,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 522,
+    "api_call_count": 44
+  }
+}
