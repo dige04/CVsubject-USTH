@@ -1,0 +1,34 @@
+{
+  "cli_version": "0.4.5",
+  "checkpoint_id": "745476e0ab98",
+  "strategy": "manual-commit",
+  "branch": "master",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "game/cnn_model.onnx",
+    "game/main.js",
+    "models/plots/hagrid_samples.png",
+    "outputs/data_pipeline.png",
+    "outputs/hagrid_samples.png",
+    "outputs/presentation.pdf",
+    "outputs/presentation.tex",
+    "outputs/report.pdf",
+    "outputs/report.tex"
+  ],
+  "sessions": [
+    {
+      "metadata": "/74/5476e0ab98/0/metadata.json",
+      "transcript": "/74/5476e0ab98/0/full.jsonl",
+      "context": "/74/5476e0ab98/0/context.md",
+      "content_hash": "/74/5476e0ab98/0/content_hash.txt",
+      "prompt": "/74/5476e0ab98/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 4712286,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 522,
+    "api_call_count": 44
+  }
+}

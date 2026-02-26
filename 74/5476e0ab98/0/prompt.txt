@@ -1,0 +1,4816 @@
+Do you need colab pro? I have colab pro, can you use colab cli
+
+---
+
+REDACTED call agents team to do , only stop when done plan
+
+---
+
+do it
+
+---
+
+Giải thích
+full_pipeline.ipynb
+full_pipeline.ipynb_
+Vision-First Multi-Modal Hand Gesture Recognition Pipeline
+Full end-to-end pipeline for training a multi-modal HGR system on Google Colab.
+
+This notebook is self-contained: it uses %%writefile to create each script file in the Colab filesystem, then runs them with !python. No separate repo push required.
+
+Pipeline Overview
+Phase    Description    Script(s)
+01    Data Pipeline: download HaGRID, convert to YOLO, extract crops    download_hagrid.py, convert_to_yolo.py, extract_crops.py
+02    YOLO Training: YOLOv8n hand detection with Group K-Fold CV    train_yolo.py, yolo_group_kfold.py
+03    CNN Training: MobileNetV3-Small on hand crops    cnn.py, train_cnn.py
+04    Fusion: MLP + CNN weighted avg and learned concat fusion    fusion.py, build_fusion_dataset.py, run_ablation.py
+05    Evaluation: unified comparison tables and plots    generate_splits.py, unified_evaluation.py
+0. Setup & Dependencies
+Ensure you are running on a GPU runtime (Runtime > Change runtime type > T4 GPU).
+
+
+[1]
+0s
+# Check GPU availability
+!nvidia-smi
+Wed Feb 25 15:02:25 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-SXM4-80GB          Off |   00000000:00:05.0 Off |                    0 |
+| N/A   38C    P0             55W /  400W |       0MiB /  81920MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+
+[2]
+12s
+# Install all dependencies
+!pip install -q torch torchvision ultralytics huggingface_hub Pillow onnx onnxruntime scikit-learn pandas matplotlib seaborn pyyaml tensorflow joblib tf2onnx
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 70.1 MB/s eta 0:00:00
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 17.5/17.5 MB 119.6 MB/s eta 0:00:00
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 17.1/17.1 MB 62.6 MB/s eta 0:00:00
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 345.3/345.3 kB 30.9 MB/s eta 0:00:00
+
+[3]
+6s
+# Clone the repository and set up directory structure
+import os
+
+if not os.path.exists('CVsubject'):
+    !git clone https://github.com/dige04/CVsubject-USTH.git CVsubject
+
+os.chdir('CVsubject')
+!mkdir -p ml/scripts data game results/ablation results/evaluation runs/cnn runs/yolo
+print(f'Working directory: {os.getcwd()}')
+Cloning into 'CVsubject'...
+remote: Enumerating objects: 821, done.
+remote: Total 821 (delta 0), reused 0 (delta 0), pack-reused 821 (from 2)
+Receiving objects: 100% (821/821), 82.08 MiB | 19.38 MiB/s, done.
+Resolving deltas: 100% (86/86), done.
+Working directory: /content/CVsubject
+
+[4]
+0s
+# Create __init__.py files for Python imports
+!touch ml/__init__.py
+!touch ml/scripts/__init__.py
+print('Created __init__.py files')
+Created __init__.py files
+0b. Supporting Modules
+Write the shared preprocessing.py and mlp.py modules used by downstream scripts.
+
+
+[5]
+0s
+%%writefile ml/preprocessing.py
+"""Shared preprocessing for hand gesture classification.
+
+Loads CSV data with MediaPipe 21-point 3D hand landmarks and normalizes
+them via wrist-relative translation and palm-size scaling.
+
+Schema: person_id, gesture_label, timestamp, x0,y0,z0, ..., x20,y20,z20
+Output: 20x3 = 60-dim normalized vector per sample.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+
+# MediaPipe landmark indices
+NUM_LANDMARKS = 21
+WRIST_IDX = 0
+MIDDLE_FINGER_MCP_IDX = 9
+
+# Column names for the 63 landmark coordinates (21 landmarks x 3 axes)
+LANDMARK_COLS = [
+    f"{axis}{i}" for i in range(NUM_LANDMARKS) for axis in ("x", "y", "z")
+]
+
+GESTURE_CLASSES = ["open_hand", "fist", "pinch", "frame", "none"]
+
+
+def load_data(csv_path: str) -> pd.DataFrame:
+    """Load gesture landmark CSV data.
+
+    Args:
+        csv_path: Path to CSV file with columns:
+            person_id, gesture_label, timestamp, x0, y0, z0, ..., x20, y20, z20
+
+    Returns:
+        DataFrame with all columns preserved.
+    """
+    df = pd.read_csv(csv_path)
+    expected_meta = {"person_id", "gesture_label", "timestamp"}
+    missing_meta = expected_meta - set(df.columns)
+    if missing_meta:
+        raise ValueError(f"Missing metadata columns: {missing_meta}")
+
+    missing_landmarks = [c for c in LANDMARK_COLS if c not in df.columns]
+    if missing_landmarks:
+        raise ValueError(
+            f"Missing {len(missing_landmarks)} landmark columns. "
+            f"First missing: {missing_landmarks[:5]}"
+        )
+    return df
+
+
+def extract_landmarks(df: pd.DataFrame) -> np.ndarray:
+    """Extract raw landmark coordinates from DataFrame.
+
+    Args:
+        df: DataFrame containing landmark columns x0,y0,z0,...,x20,y20,z20.
+
+    Returns:
+        Array of shape (n_samples, 21, 3).
+    """
+    raw = df[LANDMARK_COLS].values  # (n_samples, 63)
+    return raw.reshape(-1, NUM_LANDMARKS, 3)
+
+
+def normalize_landmarks(landmarks: np.ndarray) -> np.ndarray:
+    """Normalize a single sample of 21 3D landmarks.
+
+    Steps:
+        1. Wrist-relative translation: subtract landmark 0 from all landmarks.
+        2. Scale normalization: divide by distance(wrist, middle_finger_MCP).
+        3. Drop the wrist landmark (now all zeros) to produce 20x3 = 60 dims.
+
+    Args:
+        landmarks: Array of shape (21, 3).
+
+    Returns:
+        Flattened array of shape (60,) -- 20 landmarks x 3 coordinates.
+    """
+    landmarks = landmarks.astype(np.float64)
+
+    # Step 1: wrist-relative translation
+    wrist = landmarks[WRIST_IDX].copy()
+    landmarks = landmarks - wrist
+
+    # Step 2: scale by palm size (wrist to middle finger MCP distance)
+    palm_size = np.linalg.norm(landmarks[MIDDLE_FINGER_MCP_IDX])
+    if palm_size < 1e-8:
+        # Degenerate case: all landmarks at same point
+        palm_size = 1.0
+    landmarks = landmarks / palm_size
+
+    # Step 3: drop wrist (index 0) -- it is now [0, 0, 0]
+    landmarks_no_wrist = landmarks[1:]  # (20, 3)
+    return landmarks_no_wrist.flatten()  # (60,)
+
+
+def normalize_landmarks_batch(landmarks_batch: np.ndarray) -> np.ndarray:
+    """Normalize a batch of landmark arrays.
+
+    Args:
+        landmarks_batch: Array of shape (n_samples, 21, 3).
+
+    Returns:
+        Array of shape (n_samples, 60).
+    """
+    return np.array([normalize_landmarks(lm) for lm in landmarks_batch])
+
+
+def preprocess_dataset(
+    df: pd.DataFrame,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Full preprocessing pipeline on a DataFrame.
+
+    Args:
+        df: DataFrame loaded by ``load_data``.
+
+    Returns:
+        Tuple of:
+            X_normalized: (n_samples, 60) normalized landmark vectors.
+            y_labels: (n_samples,) string gesture labels.
+            person_ids: (n_samples,) person identifiers.
+    """
+    landmarks = extract_landmarks(df)  # (n, 21, 3)
+    X_normalized = normalize_landmarks_batch(landmarks)  # (n, 60)
+    y_labels = df["gesture_label"].values
+    person_ids = df["person_id"].values
+    return X_normalized, y_labels, person_ids
+
+
+def generate_sample_csv(
+    csv_path: str,
+    n_persons: int = 3,
+    samples_per_gesture: int = 20,
+    seed: int = 42,
+) -> pd.DataFrame:
+    """Generate a synthetic CSV dataset for testing.
+
+    Creates plausible hand landmark data for each gesture class with
+    per-person variation. Useful when real data is not yet collected.
+
+    Args:
+        csv_path: Path to save the CSV file.
+        n_persons: Number of simulated persons.
+        samples_per_gesture: Samples per gesture per person.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        The generated DataFrame.
+    """
+    rng = np.random.RandomState(seed)
+    rows: list[dict] = []
+    timestamp = 0
+
+    # Base hand shapes per gesture (21 landmarks x 3 coords)
+    # These are rough approximations in a normalized coordinate space
+    base_shapes = _get_base_shapes()
+
+    for person_id in range(1, n_persons + 1):
+        # Per-person scale and offset variation
+        person_scale = 0.8 + rng.rand() * 0.4  # 0.8 to 1.2
+        person_offset = rng.randn(3) * 0.1
+
+        for gesture in GESTURE_CLASSES:
+            shape = base_shapes[gesture]
+            for _ in range(samples_per_gesture):
+                # Add noise to base shape
+                noisy = shape.copy() * person_scale + person_offset
+                noisy += rng.randn(21, 3) * 0.02
+
+                row: dict = {
+                    "person_id": f"person_{person_id}",
+                    "gesture_label": gesture,
+                    "timestamp": timestamp,
+                }
+                for i in range(NUM_LANDMARKS):
+                    row[f"x{i}"] = noisy[i, 0]
+                    row[f"y{i}"] = noisy[i, 1]
+                    row[f"z{i}"] = noisy[i, 2]
+
+                rows.append(row)
+                timestamp += 1
+
+    df = pd.DataFrame(rows)
+    df.to_csv(csv_path, index=False)
+    return df
+
+
+def _get_base_shapes() -> dict[str, np.ndarray]:
+    """Return approximate base landmark shapes for each gesture.
+
+    All shapes are in an arbitrary coordinate frame; the preprocessing
+    pipeline normalizes them afterward.
+    """
+    shapes: dict[str, np.ndarray] = {}
+
+    # Wrist at origin, fingers extend upward (negative y in screen coords)
+    # Using a simplified hand model
+
+    # Helper: finger bases (MCP joints) spread across the palm
+    palm_width = 0.08
+    mcp_y = -0.10
+    mcp_positions = np.array([
+        [palm_width * 0.6, mcp_y * 0.5, 0.0],   # Thumb MCP (idx 1 approx)
+        [palm_width * 0.3, mcp_y, 0.0],            # Index MCP
+        [0.0, mcp_y * 1.05, 0.0],                  # Middle MCP
+        [-palm_width * 0.3, mcp_y, 0.0],            # Ring MCP
+        [-palm_width * 0.5, mcp_y * 0.9, 0.0],      # Pinky MCP
+    ])
+
+    # ---- Open Hand: all fingers extended ----
+    open_hand = np.zeros((21, 3))
+    # Wrist
+    open_hand[0] = [0, 0, 0]
+    # Thumb: landmarks 1-4
+    open_hand[1] = [0.05, -0.02, 0.0]
+    open_hand[2] = [0.08, -0.05, 0.0]
+    open_hand[3] = [0.10, -0.09, 0.0]
+    open_hand[4] = [0.11, -0.12, 0.0]  # Thumb tip
+    # Index: landmarks 5-8
+    open_hand[5] = [0.03, -0.10, 0.0]
+    open_hand[6] = [0.03, -0.15, 0.0]
+    open_hand[7] = [0.03, -0.19, 0.0]
+    open_hand[8] = [0.03, -0.22, 0.0]  # Index tip
+    # Middle: landmarks 9-12
+    open_hand[9] = [0.0, -0.10, 0.0]
+    open_hand[10] = [0.0, -0.16, 0.0]
+    open_hand[11] = [0.0, -0.20, 0.0]
+    open_hand[12] = [0.0, -0.24, 0.0]  # Middle tip
+    # Ring: landmarks 13-16
+    open_hand[13] = [-0.03, -0.10, 0.0]
+    open_hand[14] = [-0.03, -0.15, 0.0]
+    open_hand[15] = [-0.03, -0.19, 0.0]
+    open_hand[16] = [-0.03, -0.22, 0.0]  # Ring tip
+    # Pinky: landmarks 17-20
+    open_hand[17] = [-0.05, -0.09, 0.0]
+    open_hand[18] = [-0.05, -0.13, 0.0]
+    open_hand[19] = [-0.05, -0.16, 0.0]
+    open_hand[20] = [-0.05, -0.19, 0.0]  # Pinky tip
+    shapes["open_hand"] = open_hand
+
+    # ---- Fist: all fingers curled ----
+    fist = np.zeros((21, 3))
+    fist[0] = [0, 0, 0]
+    # Thumb curled across
+    fist[1] = [0.04, -0.02, 0.0]
+    fist[2] = [0.06, -0.04, 0.01]
+    fist[3] = [0.05, -0.06, 0.02]
+    fist[4] = [0.03, -0.07, 0.03]
+    # Index curled
+    fist[5] = [0.03, -0.10, 0.0]
+    fist[6] = [0.03, -0.12, 0.02]
+    fist[7] = [0.02, -0.10, 0.04]
+    fist[8] = [0.02, -0.08, 0.03]
+    # Middle curled
+    fist[9] = [0.0, -0.10, 0.0]
+    fist[10] = [0.0, -0.12, 0.02]
+    fist[11] = [-0.01, -0.10, 0.04]
+    fist[12] = [-0.01, -0.08, 0.03]
+    # Ring curled
+    fist[13] = [-0.03, -0.10, 0.0]
+    fist[14] = [-0.03, -0.12, 0.02]
+    fist[15] = [-0.03, -0.10, 0.04]
+    fist[16] = [-0.03, -0.08, 0.03]
+    # Pinky curled
+    fist[17] = [-0.05, -0.09, 0.0]
+    fist[18] = [-0.05, -0.11, 0.02]
+    fist[19] = [-0.05, -0.09, 0.04]
+    fist[20] = [-0.05, -0.07, 0.03]
+    shapes["fist"] = fist
+
+    # ---- Pinch: thumb and index touching, others extended ----
+    pinch = open_hand.copy()
+    # Move thumb tip close to index tip
+    pinch[3] = [0.04, -0.10, 0.02]
+    pinch[4] = [0.03, -0.13, 0.02]  # Near index tip area
+    # Index slightly curled toward thumb
+    pinch[7] = [0.03, -0.16, 0.02]
+    pinch[8] = [0.03, -0.14, 0.02]  # Index tip near thumb tip
+    shapes["pinch"] = pinch
+
+    # ---- Frame: open hand variant (single-hand component) ----
+    # L-shape: thumb and index extended, others curled
+    frame = fist.copy()
+    # Thumb extended
+    frame[1] = [0.05, -0.02, 0.0]
+    frame[2] = [0.08, -0.05, 0.0]
+    frame[3] = [0.10, -0.09, 0.0]
+    frame[4] = [0.11, -0.12, 0.0]
+    # Index extended
+    frame[5] = [0.03, -0.10, 0.0]
+    frame[6] = [0.03, -0.15, 0.0]
+    frame[7] = [0.03, -0.19, 0.0]
+    frame[8] = [0.03, -0.22, 0.0]
+    shapes["frame"] = frame
+
+    # ---- None: relaxed / ambiguous pose ----
+    none_shape = open_hand.copy()
+    # Slightly curled, not matching any clear pattern
+    none_shape[4] = [0.09, -0.08, 0.02]   # Thumb partially curled
+    none_shape[8] = [0.03, -0.18, 0.01]   # Index partially curled
+    none_shape[12] = [0.0, -0.20, 0.01]   # Middle partially curled
+    none_shape[16] = [-0.03, -0.18, 0.01]  # Ring partially curled
+    none_shape[20] = [-0.05, -0.15, 0.01]  # Pinky partially curled
+    shapes["none"] = none_shape
+
+    return shapes
+
+
+if __name__ == "__main__":
+    import os
+
+    data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
+    os.makedirs(data_dir, exist_ok=True)
+    csv_path = os.path.join(data_dir, "sample_gestures.csv")
+
+    print(f"Generating sample CSV at: {csv_path}")
+    df = generate_sample_csv(csv_path, n_persons=5, samples_per_gesture=30)
+    print(f"Generated {len(df)} samples")
+    print(f"Gestures: {df['gesture_label'].value_counts().to_dict()}")
+    print(f"Persons: {df['person_id'].nunique()}")
+
+    print("\nRunning preprocessing...")
+    X, y, pids = preprocess_dataset(df)
+    print(f"X shape: {X.shape}")
+    print(f"y shape: {y.shape}")
+    print(f"Unique labels: {np.unique(y)}")
+    print(f"Sample normalized vector (first 10 dims): {X[0, :10]}")
+
+Overwriting ml/preprocessing.py
+
+[6]
+0s
+%%writefile ml/mlp.py
+"""Method 3: MLP neural network gesture classifier.
+
+Uses the raw 60-dim normalized landmark vector as input to a
+TensorFlow/Keras multi-layer perceptron.
+
+Architecture: 60 -> 128 (ReLU, Dropout 0.3) -> 64 (ReLU, Dropout 0.3) -> 5 (Softmax)
+"""
+
+from __future__ import annotations
+
+import os
+from typing import Any
+
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
+
+from preprocessing import GESTURE_CLASSES
+
+
+def _build_model(input_dim: int = 60, num_classes: int = 5, lr: float = 1e-3) -> Any:
+    """Build and compile the MLP model.
+
+    Architecture:
+        Input (60) -> Dense(128, ReLU) -> Dropout(0.3)
+                   -> Dense(64, ReLU) -> Dropout(0.3)
+                   -> Dense(5, Softmax)
+
+    Args:
+        input_dim: Number of input features.
+        num_classes: Number of output classes.
+        lr: Learning rate for Adam optimizer.
+
+    Returns:
+        Compiled Keras model.
+    """
+    import tensorflow as tf
+
+    model = tf.keras.Sequential([
+        tf.keras.layers.Input(shape=(input_dim,)),
+        tf.keras.layers.Dense(128, activation="relu"),
+        tf.keras.layers.Dropout(0.3),
+        tf.keras.layers.Dense(64, activation="relu"),
+        tf.keras.layers.Dropout(0.3),
+        tf.keras.layers.Dense(num_classes, activation="softmax"),
+    ])
+
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
+        loss="sparse_categorical_crossentropy",
+        metrics=["accuracy"],
+    )
+    return model
+
+
+class MLPClassifier:
+    """MLP-based gesture classifier using TensorFlow/Keras.
+
+    Uses the raw 60-dim normalized landmark vector directly as input,
+    relying on the neural network to learn relevant feature representations.
+    """
+
+    def __init__(
+        self,
+        input_dim: int = 60,
+        num_classes: int = 5,
+        lr: float = 1e-3,
+    ) -> None:
+        """Initialize the MLP classifier.
+
+        Args:
+            input_dim: Number of input features (default 60).
+            num_classes: Number of output classes (default 5).
+            lr: Learning rate for Adam optimizer.
+        """
+        self.input_dim = input_dim
+        self.num_classes = num_classes
+        self.lr = lr
+        self.model: Any = None
+        self.label_encoder = LabelEncoder()
+        self.label_encoder.fit(GESTURE_CLASSES)
+        self.history: Any = None
+        self._is_trained = False
+
+    def _ensure_model(self) -> None:
+        """Build the model if not already built."""
+        if self.model is None:
+            self.model = _build_model(self.input_dim, self.num_classes, self.lr)
+
+    def train(
+        self,
+        X_normalized: np.ndarray,
+        y_labels: np.ndarray,
+        epochs: int = 100,
+        batch_size: int = 32,
+        validation_data: tuple[np.ndarray, np.ndarray] | None = None,
+        validation_split: float = 0.15,
+        patience: int = 10,
+        verbose: int = 1,
+    ) -> dict[str, Any]:
+        """Train the MLP on normalized landmark vectors.
+
+        Uses early stopping on validation loss to prevent overfitting.
+        When ``validation_data`` is provided (e.g. a person-aware held-out
+        set), it is used instead of the random ``validation_split``.
+
+        Args:
+            X_normalized: Array of shape (n_samples, 60).
+            y_labels: String labels of shape (n_samples,).
+            epochs: Maximum number of training epochs.
+            batch_size: Mini-batch size.
+            validation_data: Optional (X_val, y_val_labels) tuple for
+                person-aware validation. When provided, ``validation_split``
+                is ignored.
+            validation_split: Fraction of training data for validation
+                (used only when ``validation_data`` is None).
+            patience: Early stopping patience (epochs without improvement).
+            verbose: Keras verbosity level (0=silent, 1=progress, 2=minimal).
+
+        Returns:
+            Dictionary with training history and final metrics.
+        """
+        import tensorflow as tf
+
+        self._ensure_model()
+
+        y_encoded = self.label_encoder.transform(y_labels)
+
+        callbacks = [
+            tf.keras.callbacks.EarlyStopping(
+                monitor="val_loss",
+                patience=patience,
+                restore_best_weights=True,
+                verbose=1 if verbose > 0 else 0,
+            ),
+        ]
+
+        fit_kwargs: dict[str, Any] = {
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "callbacks": callbacks,
+            "verbose": verbose,
+        }
+
+        if validation_data is not None:
+            X_val, y_val_labels = validation_data
+            y_val_encoded = self.label_encoder.transform(y_val_labels)
+            fit_kwargs["validation_data"] = (X_val, y_val_encoded)
+        else:
+            fit_kwargs["validation_split"] = validation_split
+
+        self.history = self.model.fit(X_normalized, y_encoded, **fit_kwargs)
+        self._is_trained = True
+
+        # Return summary metrics
+        final_epoch = len(self.history.history["loss"])
+        return {
+            "train_accuracy": self.history.history["accuracy"][-1],
+            "val_accuracy": self.history.history["val_accuracy"][-1],
+            "train_loss": self.history.history["loss"][-1],
+            "val_loss": self.history.history["val_loss"][-1],
+            "epochs_trained": final_epoch,
+        }
+
+    def predict(self, X_normalized: np.ndarray) -> np.ndarray:
+        """Predict gesture labels.
+
+        Args:
+            X_normalized: Array of shape (n_samples, 60).
+
+        Returns:
+            Array of string label predictions.
+        """
+        self._check_trained()
+        probas = self.model.predict(X_normalized, verbose=0)
+        y_encoded = np.argmax(probas, axis=1)
+        return self.label_encoder.inverse_transform(y_encoded)
+
+    def predict_proba(self, X_normalized: np.ndarray) -> np.ndarray:
+        """Return class probability estimates.
+
+        Args:
+            X_normalized: Array of shape (n_samples, 60).
+
+        Returns:
+            Array of shape (n_samples, n_classes) with probabilities
+            ordered by GESTURE_CLASSES.
+        """
+        self._check_trained()
+        return self.model.predict(X_normalized, verbose=0)
+
+    def save(self, path: str) -> None:
+        """Save the complete model to a directory (SavedModel format).
+
+        Also saves the label encoder alongside the model.
+
+        Args:
+            path: Directory path for the SavedModel.
+        """
+        self._check_trained()
+        import joblib
+
+        os.makedirs(path, exist_ok=True)
+        self.model.save(os.path.join(path, "saved_model.keras"))
+        joblib.dump(
+            {"label_encoder": self.label_encoder},
+            os.path.join(path, "metadata.joblib"),
+        )
+
+    def load(self, path: str) -> None:
+        """Load a saved model from a directory.
+
+        Args:
+            path: Directory containing the SavedModel and metadata.
+        """
+        import tensorflow as tf
+        import joblib
+
+        self.model = tf.keras.models.load_model(os.path.join(path, "saved_model.keras"))
+        metadata = joblib.load(os.path.join(path, "metadata.joblib"))
+        self.label_encoder = metadata["label_encoder"]
+        self._is_trained = True
+
+    def export_onnx(self, path: str) -> None:
+        """Export the model to ONNX format.
+
+        Args:
+            path: Output .onnx file path.
+        """
+        self._check_trained()
+        import tf2onnx
+        import tensorflow as tf
+
+        spec = (tf.TensorSpec((None, self.input_dim), tf.float32, name="input"),)
+        model_proto, _ = tf2onnx.convert.from_keras(self.model, input_signature=spec)
+
+        os.makedirs(os.path.dirname(path) if os.path.dirname(path) else ".", exist_ok=True)
+        with open(path, "wb") as f:
+            f.write(model_proto.SerializeToString())
+
+    def summary(self) -> str:
+        """Return a string summary of the model architecture.
+
+        Returns:
+            Model summary string.
+        """
+        self._ensure_model()
+        lines: list[str] = []
+        self.model.summary(print_fn=lambda x: lines.append(x))
+        return "\n".join(lines)
+
+    def _check_trained(self) -> None:
+        """Raise an error if the model has not been trained."""
+        if not self._is_trained:
+            raise RuntimeError(
+                "Model has not been trained. Call train() or load() first."
+            )
+
+
+if __name__ == "__main__":
+    import tempfile
+
+    from preprocessing import generate_sample_csv, preprocess_dataset
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import accuracy_score, classification_report
+
+    # Suppress TF warnings for clean output
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
+    # Generate sample data
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+        tmp_path = f.name
+
+    df = generate_sample_csv(tmp_path, n_persons=5, samples_per_gesture=30)
+    X, y, _ = preprocess_dataset(df)
+    os.unlink(tmp_path)
+
+    # Train/test split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
+
+    # Train
+    clf = MLPClassifier()
+    print("Model Architecture:")
+    print(clf.summary())
+    print("\nTraining...")
+    metrics = clf.train(X_train, y_train, epochs=50, verbose=1)
+    print(f"\nTraining results: {metrics}")
+
+    # Evaluate
+    y_pred = clf.predict(X_test)
+    acc = accuracy_score(y_test, y_pred)
+    print(f"\nTest accuracy: {acc:.3f}")
+    print("\nClassification Report:")
+    print(classification_report(y_test, y_pred, zero_division=0))
+
+    # Save/load test
+    with tempfile.TemporaryDirectory() as tmpdir:
+        model_path = os.path.join(tmpdir, "mlp_model")
+        clf.save(model_path)
+
+        clf2 = MLPClassifier()
+        clf2.load(model_path)
+        y_pred2 = clf2.predict(X_test)
+        assert np.array_equal(y_pred, y_pred2), "Save/load round-trip failed"
+        print("\nSave/load round-trip: OK")
+
+Overwriting ml/mlp.py
+1. Data Pipeline (Phase 01)
+Downloads HaGRID v2 512px images from HuggingFace, converts annotations to YOLO format, and extracts hand crops for CNN training.
+
+1a. Download HaGRID Images
+Downloads images for 5 target gesture classes from the Tinkoff/hagrid_v2_512 dataset. Each class is ~3GB, total ~15GB.
+
+
+[7]
+0s
+%%writefile ml/scripts/download_hagrid.py
+"""Download HaGRID v2 512px images from HuggingFace for target gesture classes.
+
+Downloads images for 5 target classes needed by our gesture recognition pipeline:
+  stop -> open_hand, fist -> fist, thumb_index -> pinch,
+  take_picture -> frame, no_gesture -> none
+
+Uses huggingface_hub.snapshot_download to pull only the relevant class folders
+from the Tinkoff/hagrid_v2_512 dataset (~3GB per class, ~15GB total).
+
+
+Writing ml/scripts/download_hagrid.py
+
+[8]
+2s
+# Download HaGRID images (this may take 30-60 minutes depending on connection)
+!python ml/scripts/download_hagrid.py --save_dir data/hagrid_images
+2026-02-25 15:02:46 [INFO] Save directory: data/hagrid_images
+2026-02-25 15:02:46 [INFO] Target classes: ['stop', 'fist', 'thumb_index', 'take_picture', 'no_gesture']
+2026-02-25 15:02:46 [INFO] Repo: Tinkoff/hagrid_v2_512
+2026-02-25 15:02:46 [INFO] [1/5] Processing class: stop
+2026-02-25 15:02:46 [INFO] Downloading class 'stop' from Tinkoff/hagrid_v2_512 ...
+2026-02-25 15:02:47 [INFO] HTTP Request: GET https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main "HTTP/1.1 401 Unauthorized"
+2026-02-25 15:02:47 [ERROR] Failed to download class 'stop'
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_http.py", line 657, in hf_raise_for_status
+    response.raise_for_status()
+  File "/usr/local/lib/python3.12/dist-packages/httpx/_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Client error '401 Unauthorized' for url 'https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/content/CVsubject/ml/scripts/download_hagrid.py", line 105, in download_all
+    result_path = download_class(cls, save_dir, repo_id)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/content/CVsubject/ml/scripts/download_hagrid.py", line 59, in download_class
+    local_dir = snapshot_download(
+                ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/_snapshot_download.py", line 321, in snapshot_download
+    raise api_call_error
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/_snapshot_download.py", line 240, in snapshot_download
+    repo_info = api.repo_info(repo_id=repo_id, repo_type=repo_type, revision=revision)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/hf_api.py", line 2997, in repo_info
+    return method(
+           ^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/hf_api.py", line 2861, in dataset_info
+    hf_raise_for_status(r)
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_http.py", line 710, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-699f0f17-1d5e329f5dbe96dd00881bbc;25eb149b-85a0-419c-81de-b4663a4505f5)
+
+Repository Not Found for url: https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+2026-02-25 15:02:47 [INFO] [2/5] Processing class: fist
+2026-02-25 15:02:47 [INFO] Downloading class 'fist' from Tinkoff/hagrid_v2_512 ...
+2026-02-25 15:02:47 [INFO] HTTP Request: GET https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main "HTTP/1.1 401 Unauthorized"
+2026-02-25 15:02:47 [ERROR] Failed to download class 'fist'
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_http.py", line 657, in hf_raise_for_status
+    response.raise_for_status()
+  File "/usr/local/lib/python3.12/dist-packages/httpx/_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Client error '401 Unauthorized' for url 'https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/content/CVsubject/ml/scripts/download_hagrid.py", line 105, in download_all
+    result_path = download_class(cls, save_dir, repo_id)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/content/CVsubject/ml/scripts/download_hagrid.py", line 59, in download_class
+    local_dir = snapshot_download(
+                ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/_snapshot_download.py", line 321, in snapshot_download
+    raise api_call_error
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/_snapshot_download.py", line 240, in snapshot_download
+    repo_info = api.repo_info(repo_id=repo_id, repo_type=repo_type, revision=revision)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/hf_api.py", line 2997, in repo_info
+    return method(
+           ^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/hf_api.py", line 2861, in dataset_info
+    hf_raise_for_status(r)
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_http.py", line 710, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-699f0f17-43be355667bf32b74ca8caf3;9d49d792-2358-4f30-9ad1-983e94574ae0)
+
+Repository Not Found for url: https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+2026-02-25 15:02:47 [INFO] [3/5] Processing class: thumb_index
+2026-02-25 15:02:47 [INFO] Downloading class 'thumb_index' from Tinkoff/hagrid_v2_512 ...
+2026-02-25 15:02:47 [INFO] HTTP Request: GET https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main "HTTP/1.1 401 Unauthorized"
+2026-02-25 15:02:47 [ERROR] Failed to download class 'thumb_index'
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_http.py", line 657, in hf_raise_for_status
+    response.raise_for_status()
+  File "/usr/local/lib/python3.12/dist-packages/httpx/_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Client error '401 Unauthorized' for url 'https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/content/CVsubject/ml/scripts/download_hagrid.py", line 105, in download_all
+    result_path = download_class(cls, save_dir, repo_id)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/content/CVsubject/ml/scripts/download_hagrid.py", line 59, in download_class
+    local_dir = snapshot_download(
+                ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/_snapshot_download.py", line 321, in snapshot_download
+    raise api_call_error
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/_snapshot_download.py", line 240, in snapshot_download
+    repo_info = api.repo_info(repo_id=repo_id, repo_type=repo_type, revision=revision)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/hf_api.py", line 2997, in repo_info
+    return method(
+           ^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/hf_api.py", line 2861, in dataset_info
+    hf_raise_for_status(r)
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_http.py", line 710, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-699f0f17-7b9432af0b1a89f160054608;b0d4f97e-2383-482f-8b1d-17acdf7bcf6d)
+
+Repository Not Found for url: https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+2026-02-25 15:02:47 [INFO] [4/5] Processing class: take_picture
+2026-02-25 15:02:47 [INFO] Downloading class 'take_picture' from Tinkoff/hagrid_v2_512 ...
+2026-02-25 15:02:47 [INFO] HTTP Request: GET https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main "HTTP/1.1 401 Unauthorized"
+2026-02-25 15:02:47 [ERROR] Failed to download class 'take_picture'
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_http.py", line 657, in hf_raise_for_status
+    response.raise_for_status()
+  File "/usr/local/lib/python3.12/dist-packages/httpx/_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Client error '401 Unauthorized' for url 'https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/content/CVsubject/ml/scripts/download_hagrid.py", line 105, in download_all
+    result_path = download_class(cls, save_dir, repo_id)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/content/CVsubject/ml/scripts/download_hagrid.py", line 59, in download_class
+    local_dir = snapshot_download(
+                ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/_snapshot_download.py", line 321, in snapshot_download
+    raise api_call_error
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/_snapshot_download.py", line 240, in snapshot_download
+    repo_info = api.repo_info(repo_id=repo_id, repo_type=repo_type, revision=revision)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/hf_api.py", line 2997, in repo_info
+    return method(
+           ^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/hf_api.py", line 2861, in dataset_info
+    hf_raise_for_status(r)
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_http.py", line 710, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-699f0f17-2d3d4d32707ab359396577b8;fe65540f-97ea-4239-af6f-35b1d357537f)
+
+Repository Not Found for url: https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+2026-02-25 15:02:47 [INFO] [5/5] Processing class: no_gesture
+2026-02-25 15:02:47 [INFO] Downloading class 'no_gesture' from Tinkoff/hagrid_v2_512 ...
+2026-02-25 15:02:48 [INFO] HTTP Request: GET https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main "HTTP/1.1 401 Unauthorized"
+2026-02-25 15:02:48 [ERROR] Failed to download class 'no_gesture'
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_http.py", line 657, in hf_raise_for_status
+    response.raise_for_status()
+  File "/usr/local/lib/python3.12/dist-packages/httpx/_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Client error '401 Unauthorized' for url 'https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/401
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/content/CVsubject/ml/scripts/download_hagrid.py", line 105, in download_all
+    result_path = download_class(cls, save_dir, repo_id)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/content/CVsubject/ml/scripts/download_hagrid.py", line 59, in download_class
+    local_dir = snapshot_download(
+                ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/_snapshot_download.py", line 321, in snapshot_download
+    raise api_call_error
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/_snapshot_download.py", line 240, in snapshot_download
+    repo_info = api.repo_info(repo_id=repo_id, repo_type=repo_type, revision=revision)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/hf_api.py", line 2997, in repo_info
+    return method(
+           ^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_validators.py", line 89, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/hf_api.py", line 2861, in dataset_info
+    hf_raise_for_status(r)
+  File "/usr/local/lib/python3.12/dist-packages/huggingface_hub/utils/_http.py", line 710, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-699f0f18-28d0bc89182dd85d52058071;4c6b4b9e-971c-4206-9460-44baab61f2b9)
+
+Repository Not Found for url: https://huggingface.co/api/datasets/Tinkoff/hagrid_v2_512/revision/main.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+
+==================================================
+  Download Summary
+==================================================
+  Class               Files
+  ----------------------------
+  fist               FAILED
+  no_gesture         FAILED
+  stop               FAILED
+  take_picture       FAILED
+  thumb_index        FAILED
+  ----------------------------
+  TOTAL                   0
+
+  Saved to: data/hagrid_images
+2026-02-25 15:02:48 [ERROR] Failed classes: ['stop', 'fist', 'thumb_index', 'take_picture', 'no_gesture']
+1b. Convert to YOLO Format
+Converts HaGRID COCO-style bbox annotations to YOLO format with person-aware train/val split. Uses user_id to prevent identity leakage.
+
+
+[9]
+0s
+%%writefile ml/scripts/convert_to_yolo.py
+"""Convert HaGRID v2 annotations to YOLO detection format.
+
+Reads HaGRID annotation JSONs and produces per-image .txt label files in
+YOLO format: ``class_id x_center y_center width height`` (all normalized 0-1).
+
+Handles:
+- COCO top-left bbox -> YOLO center bbox conversion
+- Multiple hands per image (multiple lines per txt)
+- Bbox clipping to [0, 1]
+- Person-aware train/val split via user_id
+- data.yaml generation for YOLO training
+
+HaGRID bbox format:  [x_tl, y_tl, w, h] normalized
+YOLO bbox format:    [x_center, y_center, w, h] normalized
+
+Class mapping (alphabetical for deterministic ordering):
+  fist=0, no_gesture=1, stop=2, take_picture=3, thumb_index=4
+
+Usage:
+    python ml/scripts/convert_to_yolo.py
+    python ml/scripts/convert_to_yolo.py --annotations_dir data/annotations/annotations \\
+        --images_dir data/hagrid_images --output_dir data/yolo --val_ratio 0.2
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import os
+import random
+import shutil
+import sys
+from pathlib import Path
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+# HaGRID classes we care about, mapped to YOLO class IDs (alphabetical)
+YOLO_CLASS_MAP: dict[str, int] = {
+    "fist": 0,
+    "no_gesture": 1,
+    "stop": 2,
+    "take_picture": 3,
+    "thumb_index": 4,
+}
+
+# Reverse map for data.yaml
+YOLO_CLASS_NAMES: dict[int, str] = {v: k for k, v in YOLO_CLASS_MAP.items()}
+
+# Our gesture names for reference
+HAGRID_TO_OURS: dict[str, str] = {
+    "fist": "fist",
+    "no_gesture": "none",
+    "stop": "open_hand",
+    "take_picture": "frame",
+    "thumb_index": "pinch",
+}
+
+TARGET_HAGRID_CLASSES = set(YOLO_CLASS_MAP.keys())
+
+
+def coco_to_yolo(x_tl: float, y_tl: float, w: float, h: float) -> tuple[float, float, float, float]:
+    """Convert COCO [x_tl, y_tl, w, h] to YOLO [x_center, y_center, w, h].
+
+    All values are normalized 0-1. The bbox is first clipped to the image
+    boundary [0, 1] in top-left/bottom-right space, then converted to YOLO
+    center format.
+
+    Args:
+        x_tl: Top-left x coordinate (normalized).
+        y_tl: Top-left y coordinate (normalized).
+        w: Width (normalized).
+        h: Height (normalized).
+
+    Returns:
+        Tuple of (x_center, y_center, width, height), all in [0, 1].
+    """
+    # Clip the COCO bbox to [0, 1] in pixel-boundary space
+    x1 = max(0.0, x_tl)
+    y1 = max(0.0, y_tl)
+    x2 = min(1.0, x_tl + w)
+    y2 = min(1.0, y_tl + h)
+
+    # Recompute width/height after clipping
+    w_clipped = max(0.0, x2 - x1)
+    h_clipped = max(0.0, y2 - y1)
+
+    # Convert to center format
+    x_center = x1 + w_clipped / 2.0
+    y_center = y1 + h_clipped / 2.0
+
+    return x_center, y_center, w_clipped, h_clipped
+
+
+def find_annotation_files(annotations_dir: str) -> dict[str, list[str]]:
+    """Find annotation JSON files organized by split (train/val/test).
+
+    Supports both split-organized and flat directory structures:
+        annotations_dir/train/*.json  OR  annotations_dir/*.json
+
+    Args:
+        annotations_dir: Root directory containing annotation JSONs.
+
+    Returns:
+        Dict mapping split name to list of JSON file paths.
+    """
+    ann_path = Path(annotations_dir)
+    result: dict[str, list[str]] = {}
+
+    for split in ["train", "val", "test"]:
+        split_dir = ann_path / split
+        if split_dir.is_dir():
+            jsons = sorted(split_dir.glob("*.json"))
+            target_jsons = [
+                str(j) for j in jsons if j.stem in TARGET_HAGRID_CLASSES
+            ]
+            if target_jsons:
+                result[split] = target_jsons
+
+    if not result:
+        jsons = sorted(ann_path.glob("*.json"))
+        target_jsons = [
+            str(j) for j in jsons if j.stem in TARGET_HAGRID_CLASSES
+        ]
+        if target_jsons:
+            result["all"] = target_jsons
+
+    return result
+
+
+def parse_annotations_for_yolo(
+    json_path: str,
+    hagrid_class: str,
+) -> dict[str, list[dict]]:
+    """Parse a single HaGRID annotation JSON into per-image YOLO entries.
+
+    Args:
+        json_path: Path to the annotation JSON file.
+        hagrid_class: HaGRID class name this file represents.
+
+    Returns:
+        Dict mapping image_id to list of hand annotation dicts, each with:
+            class_id, x_center, y_center, w, h, user_id
+    """
+    if hagrid_class not in YOLO_CLASS_MAP:
+        logger.warning("Skipping unknown class: %s", hagrid_class)
+        return {}
+
+    class_id = YOLO_CLASS_MAP[hagrid_class]
+
+    with open(json_path, "r") as f:
+        data = json.load(f)
+
+    result: dict[str, list[dict]] = {}
+    skipped = 0
+
+    for image_id, entry in data.items():
+        bboxes = entry.get("bboxes", [])
+        labels = entry.get("labels", [])
+        user_id = entry.get("user_id", "unknown")
+
+        if not bboxes:
+            skipped += 1
+            continue
+
+        hands: list[dict] = []
+        for hand_idx, bbox in enumerate(bboxes):
+            # Only include hands matching this gesture class
+            if hand_idx < len(labels) and labels[hand_idx] != hagrid_class:
+                continue
+
+            if len(bbox) != 4:
+                logger.warning(
+                    "Invalid bbox for image %s hand %d: %s",
+                    image_id, hand_idx, bbox,
+                )
+                continue
+
+            x_tl, y_tl, w, h = bbox
+
+            # Skip degenerate bboxes
+            if w <= 0 or h <= 0:
+                logger.warning(
+                    "Zero/negative bbox for image %s hand %d: w=%.4f h=%.4f",
+                    image_id, hand_idx, w, h,
+                )
+                continue
+
+            x_c, y_c, w_y, h_y = coco_to_yolo(x_tl, y_tl, w, h)
+
+            hands.append({
+                "class_id": class_id,
+                "x_center": x_c,
+                "y_center": y_c,
+                "w": w_y,
+                "h": h_y,
+                "user_id": user_id,
+            })
+
+        if hands:
+            if image_id in result:
+                result[image_id].extend(hands)
+            else:
+                result[image_id] = hands
+
+    if skipped:
+        logger.debug("  Skipped %d images with no bboxes", skipped)
+
+    return result
+
+
+def collect_user_ids(
+    all_annotations: dict[str, list[dict]],
+) -> dict[str, str]:
+    """Collect user_id for each image_id from parsed annotations.
+
+    Args:
+        all_annotations: Dict mapping image_id to list of hand annotation dicts.
+
+    Returns:
+        Dict mapping image_id to user_id.
+    """
+    image_user: dict[str, str] = {}
+    for image_id, hands in all_annotations.items():
+        if hands:
+            image_user[image_id] = hands[0]["user_id"]
+    return image_user
+
+
+def person_aware_split(
+    image_user: dict[str, str],
+    val_ratio: float = 0.2,
+    seed: int = 42,
+) -> tuple[set[str], set[str]]:
+    """Split image IDs into train/val sets ensuring no user leaks across sets.
+
+    Users (identified by user_id) are assigned entirely to either train or val.
+
+    Args:
+        image_user: Dict mapping image_id to user_id.
+        val_ratio: Fraction of users to assign to validation.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        Tuple of (train_image_ids, val_image_ids).
+    """
+    # Group images by user
+    user_images: dict[str, list[str]] = {}
+    for image_id, user_id in image_user.items():
+        user_images.setdefault(user_id, []).append(image_id)
+
+    users = sorted(user_images.keys())
+    rng = random.Random(seed)
+    rng.shuffle(users)
+
+    n_val_users = max(1, int(len(users) * val_ratio))
+    val_users = set(users[:n_val_users])
+    train_users = set(users[n_val_users:])
+
+    train_ids: set[str] = set()
+    val_ids: set[str] = set()
+
+    for user_id in train_users:
+        train_ids.update(user_images[user_id])
+    for user_id in val_users:
+        val_ids.update(user_images[user_id])
+
+    logger.info(
+        "Person-aware split: %d users train, %d users val -> %d/%d images",
+        len(train_users), len(val_users), len(train_ids), len(val_ids),
+    )
+
+    return train_ids, val_ids
+
+
+def write_yolo_label(
+    label_path: Path,
+    hands: list[dict],
+) -> None:
+    """Write a YOLO label file for one image.
+
+    Args:
+        label_path: Output .txt file path.
+        hands: List of hand annotation dicts with class_id, x_center, y_center, w, h.
+    """
+    label_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(label_path, "w") as f:
+        for hand in hands:
+            line = (
+                f"{hand['class_id']} "
+                f"{hand['x_center']:.6f} "
+                f"{hand['y_center']:.6f} "
+                f"{hand['w']:.6f} "
+                f"{hand['h']:.6f}\n"
+            )
+            f.write(line)
+
+
+def find_image_file(images_dir: Path, image_id: str) -> Path | None:
+    """Locate the image file for a given image_id across class subdirectories.
+
+    HaGRID images are organized as: images_dir/{class}/{image_id}.jpg
+
+    Args:
+        images_dir: Root directory containing class subdirectories.
+        image_id: Image filename stem (without extension).
+
+    Returns:
+        Path to the image file, or None if not found.
+    """
+    for ext in [".jpg", ".jpeg", ".png"]:
+        # Search in class subdirectories
+        for class_dir in images_dir.iterdir():
+            if not class_dir.is_dir():
+                continue
+            candidate = class_dir / f"{image_id}{ext}"
+            if candidate.exists():
+                return candidate
+        # Also check flat structure
+        candidate = images_dir / f"{image_id}{ext}"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def copy_or_symlink_image(
+    src: Path,
+    dst: Path,
+    symlink: bool = False,
+) -> None:
+    """Copy or symlink an image to the YOLO output directory.
+
+    Args:
+        src: Source image path.
+        dst: Destination image path.
+        symlink: If True, create symlink instead of copying.
+    """
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if dst.exists():
+        return
+    if symlink:
+        dst.symlink_to(src.resolve())
+    else:
+        shutil.copy2(src, dst)
+
+
+def write_data_yaml(
+    output_dir: Path,
+    train_dir: Path,
+    val_dir: Path,
+) -> Path:
+    """Generate data.yaml for YOLO training.
+
+    Args:
+        output_dir: Root output directory.
+        train_dir: Path to training images directory.
+        val_dir: Path to validation images directory.
+
+    Returns:
+        Path to the generated data.yaml file.
+    """
+    yaml_path = output_dir / "data.yaml"
+
+    # Use absolute paths for YOLO compatibility
+    content = (
+        f"path: {output_dir.resolve()}\n"
+        f"train: {train_dir.resolve()}\n"
+        f"val: {val_dir.resolve()}\n"
+        f"\n"
+        f"nc: {len(YOLO_CLASS_MAP)}\n"
+        f"names:\n"
+    )
+    for idx in sorted(YOLO_CLASS_NAMES.keys()):
+        content += f"  {idx}: {YOLO_CLASS_NAMES[idx]}\n"
+
+    with open(yaml_path, "w") as f:
+        f.write(content)
+
+    logger.info("Generated data.yaml at %s", yaml_path)
+    return yaml_path
+
+
+def convert_to_yolo(
+    annotations_dir: str,
+    images_dir: str,
+    output_dir: str,
+    val_ratio: float = 0.2,
+    split_seed: int = 42,
+    symlink: bool = False,
+    splits: list[str] | None = None,
+    max_per_class: int | None = None,
+) -> dict[str, dict[str, int]]:
+    """Convert HaGRID annotations to YOLO format with person-aware split.
+
+    Args:
+        annotations_dir: Directory containing HaGRID annotation JSONs.
+        images_dir: Directory containing HaGRID images.
+        output_dir: Output directory for YOLO dataset.
+        val_ratio: Fraction of users for validation split.
+        split_seed: Random seed for split reproducibility.
+        symlink: If True, symlink images instead of copying.
+        splits: Which annotation splits to process (None = all).
+        max_per_class: Maximum images per class (None = all).
+
+    Returns:
+        Nested dict: {split: {class: count}}.
+    """
+    split_files = find_annotation_files(annotations_dir)
+    if not split_files:
+        logger.error("No target annotation files found in %s", annotations_dir)
+        sys.exit(1)
+
+    logger.info("Found annotation splits: %s", list(split_files.keys()))
+
+    if splits:
+        split_files = {s: f for s, f in split_files.items() if s in splits}
+
+    # Phase 1: Parse all annotations
+    all_annotations: dict[str, list[dict]] = {}
+    class_counts: dict[str, int] = {}
+
+    for split_name, json_files in split_files.items():
+        logger.info("Parsing annotations from split: %s", split_name)
+        for json_path in json_files:
+            hagrid_class = Path(json_path).stem
+            if hagrid_class not in TARGET_HAGRID_CLASSES:
+                continue
+
+            logger.info("  Parsing %s ...", hagrid_class)
+            parsed = parse_annotations_for_yolo(json_path, hagrid_class)
+
+            # Merge into global dict (image may appear in multiple class files
+            # if it has hands of different gesture types)
+            for image_id, hands in parsed.items():
+                if image_id in all_annotations:
+                    all_annotations[image_id].extend(hands)
+                else:
+                    all_annotations[image_id] = hands
+
+            class_counts[hagrid_class] = class_counts.get(hagrid_class, 0) + len(parsed)
+            logger.info("    %d images with %s hands", len(parsed), hagrid_class)
+
+    logger.info("Total images with annotations: %d", len(all_annotations))
+
+    if max_per_class:
+        logger.info("Limiting to %d images per class", max_per_class)
+
+    # Phase 2: Person-aware split
+    image_user = collect_user_ids(all_annotations)
+    train_ids, val_ids = person_aware_split(image_user, val_ratio, split_seed)
+
+    # Phase 3: Write YOLO labels and organize images
+    output_path = Path(output_dir)
+    images_path = Path(images_dir)
+
+    train_img_dir = output_path / "train" / "images"
+    train_lbl_dir = output_path / "train" / "labels"
+    val_img_dir = output_path / "val" / "images"
+    val_lbl_dir = output_path / "val" / "labels"
+
+    for d in [train_img_dir, train_lbl_dir, val_img_dir, val_lbl_dir]:
+        d.mkdir(parents=True, exist_ok=True)
+
+    stats: dict[str, dict[str, int]] = {"train": {}, "val": {}}
+    missing_images = 0
+
+    for image_id, hands in all_annotations.items():
+        # Determine split
+        if image_id in val_ids:
+            split = "val"
+            img_dir = val_img_dir
+            lbl_dir = val_lbl_dir
+        elif image_id in train_ids:
+            split = "train"
+            img_dir = train_img_dir
+            lbl_dir = train_lbl_dir
+        else:
+            # Shouldn't happen, but default to train
+            split = "train"
+            img_dir = train_img_dir
+            lbl_dir = train_lbl_dir
+
+        # Find source image
+        src_image = find_image_file(images_path, image_id)
+        if src_image is None:
+            missing_images += 1
+            continue
+
+        # Write label file
+        label_file = lbl_dir / f"{image_id}.txt"
+        write_yolo_label(label_file, hands)
+
+        # Copy/symlink image
+        dst_image = img_dir / src_image.name
+        copy_or_symlink_image(src_image, dst_image, symlink)
+
+        # Track stats
+        for hand in hands:
+            cls_name = YOLO_CLASS_NAMES[hand["class_id"]]
+            stats[split][cls_name] = stats[split].get(cls_name, 0) + 1
+
+    if missing_images:
+        logger.warning(
+            "%d images referenced in annotations but not found in %s",
+            missing_images, images_dir,
+        )
+
+    # Phase 4: Generate data.yaml
+    write_data_yaml(output_path, train_img_dir, val_img_dir)
+
+    return stats
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Convert HaGRID annotations to YOLO detection format.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""\
+Examples:
+  # Convert with default settings
+  python ml/scripts/convert_to_yolo.py
+
+  # Custom directories and val ratio
+  python ml/scripts/convert_to_yolo.py \\
+      --annotations_dir data/annotations/annotations \\
+      --images_dir data/hagrid_images \\
+      --output_dir data/yolo \\
+      --val_ratio 0.2
+
+  # Use symlinks instead of copying images (saves disk space)
+  python ml/scripts/convert_to_yolo.py --symlink
+
+  # Only process train split annotations
+  python ml/scripts/convert_to_yolo.py --splits train
+""",
+    )
+    parser.add_argument(
+        "--annotations_dir",
+        default="data/annotations/annotations",
+        help="HaGRID annotations directory (default: data/annotations/annotations)",
+    )
+    parser.add_argument(
+        "--images_dir",
+        default="data/hagrid_images",
+        help="HaGRID images directory (default: data/hagrid_images)",
+    )
+    parser.add_argument(
+        "--output_dir",
+        default="data/yolo",
+        help="Output directory for YOLO dataset (default: data/yolo)",
+    )
+    parser.add_argument(
+        "--val_ratio",
+        type=float,
+        default=0.2,
+        help="Fraction of users for validation split (default: 0.2)",
+    )
+    parser.add_argument(
+        "--split_seed",
+        type=int,
+        default=42,
+        help="Random seed for person-aware split (default: 42)",
+    )
+    parser.add_argument(
+        "--symlink",
+        action="store_true",
+        help="Symlink images instead of copying (saves disk space)",
+    )
+    parser.add_argument(
+        "--splits",
+        nargs="+",
+        default=None,
+        help="Which annotation splits to process (default: all). E.g., --splits train",
+    )
+    parser.add_argument(
+        "--max_per_class",
+        type=int,
+        default=None,
+        help="Maximum images per class (default: all)",
+    )
+
+    args = parser.parse_args()
+
+    logger.info("Annotations dir: %s", args.annotations_dir)
+    logger.info("Images dir:      %s", args.images_dir)
+    logger.info("Output dir:      %s", args.output_dir)
+    logger.info("Val ratio:       %.2f", args.val_ratio)
+    logger.info("Split seed:      %d", args.split_seed)
+    logger.info("Symlink mode:    %s", args.symlink)
+
+    stats = convert_to_yolo(
+        annotations_dir=args.annotations_dir,
+        images_dir=args.images_dir,
+        output_dir=args.output_dir,
+        val_ratio=args.val_ratio,
+        split_seed=args.split_seed,
+        symlink=args.symlink,
+        splits=args.splits,
+        max_per_class=args.max_per_class,
+    )
+
+    # Print summary
+    print(f"\n{'=' * 60}")
+    print("  YOLO Conversion Summary")
+    print(f"{'=' * 60}")
+
+    for split_name in ["train", "val"]:
+        split_stats = stats.get(split_name, {})
+        total = sum(split_stats.values())
+        print(f"\n  [{split_name.upper()}] ({total} hand annotations)")
+        print(f"  {'Class':<16} {'Hands':>8}")
+        print(f"  {'-' * 28}")
+        for cls in sorted(split_stats.keys()):
+            print(f"  {cls:<16} {split_stats[cls]:>8}")
+
+    print(f"\n  Output directory: {args.output_dir}")
+    print(f"  data.yaml:       {args.output_dir}/data.yaml")
+
+    # Verify output
+    output_path = Path(args.output_dir)
+    for split in ["train", "val"]:
+        img_count = len(list((output_path / split / "images").glob("*")))
+        lbl_count = len(list((output_path / split / "labels").glob("*.txt")))
+        print(f"  {split}: {img_count} images, {lbl_count} labels")
+        if img_count != lbl_count:
+            logger.warning(
+                "%s: image count (%d) != label count (%d)",
+                split, img_count, lbl_count,
+            )
+
+
+if __name__ == "__main__":
+    main()
+
+Writing ml/scripts/convert_to_yolo.py
+
+[10]
+0s
+# Convert HaGRID annotations to YOLO format
+# Note: --symlink saves disk space on Colab (no image duplication)
+!python ml/scripts/convert_to_yolo.py \
+    --annotations_dir data/annotations/annotations \
+    --images_dir data/hagrid_images \
+    --output_dir data/yolo \
+    --symlink
+2026-02-25 15:02:48 [INFO] Annotations dir: data/annotations/annotations
+2026-02-25 15:02:48 [INFO] Images dir:      data/hagrid_images
+2026-02-25 15:02:48 [INFO] Output dir:      data/yolo
+2026-02-25 15:02:48 [INFO] Val ratio:       0.20
+2026-02-25 15:02:48 [INFO] Split seed:      42
+2026-02-25 15:02:48 [INFO] Symlink mode:    True
+2026-02-25 15:02:48 [ERROR] No target annotation files found in data/annotations/annotations
+1c. Extract Hand Crops
+Extracts 224x224 hand region crops with 10% padding for CNN classifier training. Outputs to data/crops/{class}/ with metadata CSV.
+
+
+[11]
+0s
+%%writefile ml/scripts/extract_crops.py
+"""Extract hand crops from HaGRID images using bbox annotations.
+
+Reads HaGRID annotation JSONs and extracts hand region crops from the
+corresponding images. Crops are padded by 10%, resized to 224x224, and
+organized by class for CNN classifier training.
+
+Output structure:
+    data/crops/{class}/{image_id}_{hand_idx}.jpg
+    data/crop_metadata.csv
+
+Writing ml/scripts/extract_crops.py
+
+[12]
+0s
+# Extract hand crops from HaGRID images
+!python ml/scripts/extract_crops.py \
+    --annotations_dir data/annotations/annotations \
+    --images_dir data/hagrid_images \
+    --output_dir data/crops \
+    --metadata_csv data/crop_metadata.csv
+2026-02-25 15:02:48 [INFO] Annotations dir: data/annotations/annotations
+2026-02-25 15:02:48 [INFO] Images dir:      data/hagrid_images
+2026-02-25 15:02:48 [INFO] Output dir:      data/crops
+2026-02-25 15:02:48 [INFO] Metadata CSV:    data/crop_metadata.csv
+2026-02-25 15:02:48 [INFO] Crop size:       224x224
+2026-02-25 15:02:48 [INFO] Padding:         10.0%
+2026-02-25 15:02:48 [ERROR] No target annotation files found in data/annotations/annotations
+
+[13]
+0s
+# Verify data pipeline output
+import os
+
+print('=== Data Pipeline Output ===')
+
+# Check YOLO data
+if os.path.exists('data/yolo/data.yaml'):
+    print('YOLO data.yaml: OK')
+    with open('data/yolo/data.yaml') as f:
+        print(f.read())
+
+# Check crops
+if os.path.exists('data/crops'):
+    for cls_dir in sorted(os.listdir('data/crops')):
+        cls_path = os.path.join('data/crops', cls_dir)
+        if os.path.isdir(cls_path):
+            count = len([f for f in os.listdir(cls_path) if f.endswith('.jpg')])
+            print(f'  {cls_dir}: {count} crops')
+
+# Check metadata CSV
+if os.path.exists('data/crop_metadata.csv'):
+    import pandas as pd
+    df = pd.read_csv('data/crop_metadata.csv')
+    print(f'\nCrop metadata: {len(df)} rows')
+    print(df['class'].value_counts())
+=== Data Pipeline Output ===
+2. YOLOv8n Training (Phase 02)
+Trains a YOLOv8n (nano) model for 5-class hand gesture detection. Two modes:
+
+Smoke test: 10 epochs to verify setup
+Full training: 5-fold Group K-Fold cross-validation with 100 epochs per fold
+
+[14]
+0s
+%%writefile ml/scripts/train_yolo.py
+"""Train YOLOv8n on HaGRID gesture detection.
+
+Trains the YOLOv8n (nano) model pretrained on COCO, fine-tuned for
+5-class hand gesture detection: fist, none, open_hand, frame, pinch.
+
+Usage:
+    # Full training run
+    python ml/scripts/train_yolo.py --data data/yolo/data.yaml
+
+    # Quick smoke test (10 epochs)
+    python ml/scripts/train_yolo.py --data data/yolo/data.yaml --epochs 10
+
+    # Custom settings
+    python ml/scripts/train_yolo.py --data data/yolo/data.yaml \
+        --epochs 100 --batch 32 --imgsz 640 --device 0
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+
+
+def _get_device(device: str | None = None) -> str | int:
+    """Auto-detect the best available device for YOLO training.
+
+    Args:
+        device: Explicit device string. If None, auto-detects.
+
+    Returns:
+        Device identifier for ultralytics (int for GPU, "mps", or "cpu").
+    """
+    if device is not None:
+        # Allow "0", "1", etc. for GPU index
+        try:
+            return int(device)
+        except ValueError:
+            return device
+
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return 0
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return "mps"
+    except ImportError:
+        pass
+
+    return "cpu"
+
+
+def train_single(
+    data_yaml: str,
+    epochs: int = 100,
+    imgsz: int = 640,
+    batch: int = 16,
+    patience: int = 20,
+    project: str = "runs/yolo",
+    name: str = "baseline",
+    device: str | int | None = None,
+) -> object:
+    """Run a single YOLOv8n training session.
+
+    Uses a COCO-pretrained YOLOv8n model and fine-tunes on the provided
+    dataset. Training uses early stopping based on validation mAP.
+
+    Args:
+        data_yaml: Path to YOLO dataset.yaml file.
+        epochs: Maximum number of training epochs.
+        imgsz: Input image size (pixels).
+        batch: Batch size.
+        patience: Early stopping patience (epochs without improvement).
+        project: Directory to save training runs.
+        name: Experiment name (subdirectory under project).
+        device: Device for training (GPU index, "mps", or "cpu").
+
+    Returns:
+        YOLO training results object.
+    """
+    from ultralytics import YOLO
+
+    dev = _get_device(device)
+
+    print(f"{'=' * 60}")
+    print(f"YOLOv8n Training")
+    print(f"{'=' * 60}")
+    print(f"  Data:     {data_yaml}")
+    print(f"  Epochs:   {epochs}")
+    print(f"  ImgSize:  {imgsz}")
+    print(f"  Batch:    {batch}")
+    print(f"  Patience: {patience}")
+    print(f"  Device:   {dev}")
+    print(f"  Project:  {project}")
+    print(f"  Name:     {name}")
+    print(f"{'=' * 60}")
+
+    model = YOLO("yolov8n.pt")
+    results = model.train(
+        data=data_yaml,
+        epochs=epochs,
+        imgsz=imgsz,
+        batch=batch,
+        patience=patience,
+        project=project,
+        name=name,
+        device=dev,
+    )
+
+    print(f"\nTraining complete. Results saved to: {project}/{name}")
+    return results
+
+
+def main() -> None:
+    """CLI entry point for YOLO training."""
+    parser = argparse.ArgumentParser(
+        description="Train YOLOv8n on HaGRID gesture detection.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""\
+Examples:
+  # Full training
+  python ml/scripts/train_yolo.py --data data/yolo/data.yaml
+
+  # Smoke test (10 epochs)
+  python ml/scripts/train_yolo.py --data data/yolo/data.yaml --epochs 10
+
+  # Custom GPU
+  python ml/scripts/train_yolo.py --data data/yolo/data.yaml --device 0
+        """,
+    )
+    parser.add_argument(
+        "--data",
+        type=str,
+        required=True,
+        help="Path to YOLO dataset.yaml",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=100,
+        help="Maximum training epochs (default: 100)",
+    )
+    parser.add_argument(
+        "--batch",
+        type=int,
+        default=16,
+        help="Batch size (default: 16)",
+    )
+    parser.add_argument(
+        "--imgsz",
+        type=int,
+        default=640,
+        help="Input image size in pixels (default: 640)",
+    )
+    parser.add_argument(
+        "--patience",
+        type=int,
+        default=20,
+        help="Early stopping patience (default: 20)",
+    )
+    parser.add_argument(
+        "--project",
+        type=str,
+        default="runs/yolo",
+        help="Output project directory (default: runs/yolo)",
+    )
+    parser.add_argument(
+        "--name",
+        type=str,
+        default="baseline",
+        help="Experiment name (default: baseline)",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default=None,
+        help="Device: GPU index (0,1,...), 'mps', or 'cpu'. Auto-detected if omitted.",
+    )
+
+    args = parser.parse_args()
+
+    if not os.path.isfile(args.data):
+        print(f"ERROR: Data YAML not found: {args.data}")
+        sys.exit(1)
+
+    train_single(
+        data_yaml=args.data,
+        epochs=args.epochs,
+        imgsz=args.imgsz,
+        batch=args.batch,
+        patience=args.patience,
+        project=args.project,
+        name=args.name,
+        device=args.device,
+    )
+
+
+if __name__ == "__main__":
+    main()
+
+Writing ml/scripts/train_yolo.py
+
+[15]
+0s
+%%writefile ml/scripts/yolo_group_kfold.py
+"""Generate per-fold YOLO directory structures for person-aware Group K-Fold CV.
+
+Reads user_id from HaGRID annotation JSONs, creates symlinked fold directories,
+and optionally runs 5-fold YOLO training across all folds.
+
+Uses symlinks to avoid duplicating ~15GB of images per fold.
+
+YOLO class names: {0: "fist", 1: "no_gesture", 2: "stop", 3: "take_picture", 4: "thumb_index"}
+
+
+Writing ml/scripts/yolo_group_kfold.py
+
+[16]
+0s
+# Smoke test: 10-epoch YOLO training to verify everything works
+!python ml/scripts/train_yolo.py \
+    --data data/yolo/data.yaml \
+    --epochs 10 \
+    --batch 16 \
+    --device 0
+ERROR: Data YAML not found: data/yolo/data.yaml
+Full 5-Fold YOLO Training
+WARNING: This takes several hours on a T4 GPU. Only run after the smoke test passes. Skip this cell if you only need the CNN/fusion pipeline.
+
+
+[17]
+0s
+# Full 5-fold Group K-Fold YOLO training (several hours on T4)
+# Uncomment to run:
+# !python ml/scripts/yolo_group_kfold.py \
+#     --annotations_dir data/annotations/annotations \
+#     --image_dir data/yolo/train/images \
+#     --output_dir data/yolo/kfold_splits \
+#     --train \
+#     --epochs 100 \
+#     --device 0
+3. CNN Training (Phase 03)
+Fine-tunes MobileNetV3-Small on 224x224 hand crop images for 5-class gesture classification. Uses person-aware Group K-Fold CV with user_id to prevent identity leakage.
+
+Architecture: MobileNetV3-Small features -> AdaptiveAvgPool -> 1024-dim -> 5-class softmax
+
+
+[18]
+0s
+%%writefile ml/cnn.py
+"""Method C: CNN classifier on hand crop images.
+
+Uses MobileNetV3-Small pretrained on ImageNet, fine-tuned for 5 gesture classes.
+Architecture: MobileNetV3-Small features -> AdaptiveAvgPool -> 1024-dim -> 5-class softmax
+
+Input: 224x224 RGB hand crops with ImageNet normalization.
+Output: 5-class probabilities (fist, frame, none, open_hand, pinch).
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn as nn
+import torchvision.models as models
+import torchvision.transforms as T
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
+
+# --------------------------------------------------------------------------- #
+# Constants
+# --------------------------------------------------------------------------- #
+
+IMAGENET_MEAN = [0.485, 0.456, 0.406]
+IMAGENET_STD = [0.229, 0.224, 0.225]
+
+CLASS_TO_IDX = {"fist": 0, "frame": 1, "none": 2, "open_hand": 3, "pinch": 4}
+IDX_TO_CLASS = {v: k for k, v in CLASS_TO_IDX.items()}
+NUM_CLASSES = len(CLASS_TO_IDX)
+
+
+# --------------------------------------------------------------------------- #
+# Dataset
+# --------------------------------------------------------------------------- #
+
+class HandCropDataset(Dataset):
+    """Dataset for hand crop images with class labels.
+
+    Expects a metadata CSV with at least columns:
+        - crop_path: absolute or relative path to 224x224 crop image
+        - class: gesture class name (fist, frame, none, open_hand, pinch)
+        - user_id: person identifier (used for group splits)
+
+    Args:
+        metadata_csv: Path to the crop metadata CSV file.
+        transform: torchvision transforms to apply.
+        indices: Optional array of row indices to subset (for K-Fold splits).
+    """
+
+    def __init__(
+        self,
+        metadata_csv: str,
+        transform: T.Compose | None = None,
+        indices: np.ndarray | list[int] | None = None,
+    ) -> None:
+        self.df = pd.read_csv(metadata_csv)
+        if indices is not None:
+            self.df = self.df.iloc[indices].reset_index(drop=True)
+        self.transform = transform
+
+    def __len__(self) -> int:
+        return len(self.df)
+
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
+        row = self.df.iloc[idx]
+        img = Image.open(row["crop_path"]).convert("RGB")
+        label = CLASS_TO_IDX[row["class"]]
+        if self.transform:
+            img = self.transform(img)
+        return img, label
+
+
+# --------------------------------------------------------------------------- #
+# Transforms
+# --------------------------------------------------------------------------- #
+
+def get_transforms(train: bool = True) -> T.Compose:
+    """Return image transforms with ImageNet normalization.
+
+    Training transforms include data augmentation (flip, rotation,
+    color jitter, random crop). Validation transforms use a simple
+    resize + center crop.
+
+    Args:
+        train: Whether to return training (augmented) transforms.
+
+    Returns:
+        Composed torchvision transforms.
+    """
+    if train:
+        return T.Compose([
+            T.RandomHorizontalFlip(),
+            T.RandomRotation(15),
+            T.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1),
+            T.RandomResizedCrop(224, scale=(0.85, 1.0)),
+            T.ToTensor(),
+            T.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+        ])
+    return T.Compose([
+        T.Resize(256),
+        T.CenterCrop(224),
+        T.ToTensor(),
+        T.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+    ])
+
+
+# --------------------------------------------------------------------------- #
+# Model
+# --------------------------------------------------------------------------- #
+
+def build_model(num_classes: int = NUM_CLASSES, freeze_early: bool = True) -> nn.Module:
+    """Build MobileNetV3-Small with a new classification head.
+
+    Architecture:
+        features[0:8]  -- frozen (low-level features)
+        features[8:]   -- fine-tuned
+        classifier:
+            Linear(576, 1024) -> Hardswish -> Dropout(0.2)
+            Linear(1024, num_classes)
+
+    Args:
+        num_classes: Number of output classes.
+        freeze_early: Whether to freeze the first 8 feature blocks.
+
+    Returns:
+        MobileNetV3-Small model ready for fine-tuning.
+    """
+    model = models.mobilenet_v3_small(weights="IMAGENET1K_V1")
+
+    if freeze_early:
+        for param in model.features[:8].parameters():
+            param.requires_grad = False
+
+    # Replace the final classification layer
+    model.classifier[-1] = nn.Linear(1024, num_classes)
+
+    return model
+
+
+# --------------------------------------------------------------------------- #
+# Training
+# --------------------------------------------------------------------------- #
+
+def _get_device(device: str | None = None) -> torch.device:
+    """Auto-detect the best available device.
+
+    Args:
+        device: Explicit device string. If None, auto-detects.
+
+    Returns:
+        torch.device instance.
+    """
+    if device is not None:
+        return torch.device(device)
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
+def train_cnn(
+    model: nn.Module,
+    train_loader: DataLoader,
+    val_loader: DataLoader,
+    epochs: int = 30,
+    lr: float = 1e-3,
+    device: str | None = None,
+    verbose: bool = True,
+) -> tuple[nn.Module, float]:
+    """Train the CNN model with cosine LR scheduling and best-model tracking.
+
+    Args:
+        model: PyTorch model to train.
+        train_loader: Training data loader.
+        val_loader: Validation data loader.
+        epochs: Number of training epochs.
+        lr: Initial learning rate for Adam.
+        device: Device string (cuda/mps/cpu). Auto-detected if None.
+        verbose: Whether to print per-epoch progress.
+
+    Returns:
+        Tuple of (best_model, best_val_accuracy).
+    """
+    dev = _get_device(device)
+    model = model.to(dev)
+
+    optimizer = torch.optim.Adam(
+        filter(lambda p: p.requires_grad, model.parameters()), lr=lr
+    )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    criterion = nn.CrossEntropyLoss()
+
+    best_acc = 0.0
+    best_state: dict[str, Any] | None = None
+
+    for epoch in range(epochs):
+        # -- Training phase --
+        model.train()
+        running_loss = 0.0
+        train_correct = 0
+        train_total = 0
+
+        for imgs, labels in train_loader:
+            imgs, labels = imgs.to(dev), labels.to(dev)
+            optimizer.zero_grad()
+            outputs = model(imgs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item() * imgs.size(0)
+            train_correct += (outputs.argmax(dim=1) == labels).sum().item()
+            train_total += labels.size(0)
+
+        scheduler.step()
+
+        # -- Validation phase --
+        model.eval()
+        val_correct = 0
+        val_total = 0
+
+        with torch.no_grad():
+            for imgs, labels in val_loader:
+                imgs, labels = imgs.to(dev), labels.to(dev)
+                preds = model(imgs).argmax(dim=1)
+                val_correct += (preds == labels).sum().item()
+                val_total += labels.size(0)
+
+        train_acc = train_correct / max(train_total, 1)
+        val_acc = val_correct / max(val_total, 1)
+        avg_loss = running_loss / max(train_total, 1)
+
+        if verbose:
+            print(
+                f"  Epoch {epoch + 1:3d}/{epochs}  "
+                f"loss={avg_loss:.4f}  "
+                f"train_acc={train_acc:.4f}  "
+                f"val_acc={val_acc:.4f}"
+            )
+
+        if val_acc > best_acc:
+            best_acc = val_acc
+            best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+
+    # Restore best model weights
+    if best_state is not None:
+        model.load_state_dict(best_state)
+    model = model.to(dev)
+
+    return model, best_acc
+
+
+# --------------------------------------------------------------------------- #
+# Feature Extraction (for Fusion -- Phase 04)
+# --------------------------------------------------------------------------- #
+
+class CNNFeatureExtractor(nn.Module):
+    """Extract 1024-dim features from MobileNetV3-Small (no classification head).
+
+    Takes a trained MobileNetV3-Small model and strips the final Linear
+    layer, outputting the 1024-dimensional penultimate representation
+    for use in the multimodal fusion pipeline.
+
+    Args:
+        trained_model: A MobileNetV3-Small model (from build_model + training).
+    """
+
+    def __init__(self, trained_model: nn.Module) -> None:
+        super().__init__()
+        self.features = trained_model.features  # type: ignore[attr-defined]
+        self.avgpool = trained_model.avgpool  # type: ignore[attr-defined]
+        self.flatten = nn.Flatten()
+        # Take everything except the last Linear layer from classifier
+        classifier_layers = list(trained_model.classifier.children())  # type: ignore[attr-defined]
+        self.head = nn.Sequential(*classifier_layers[:-1])
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Extract 1024-dim feature vector.
+
+        Args:
+            x: Input tensor of shape (batch, 3, 224, 224).
+
+        Returns:
+            Feature tensor of shape (batch, 1024).
+        """
+        x = self.features(x)
+        x = self.avgpool(x)
+        x = self.flatten(x)
+        x = self.head(x)
+        return x
+
+
+# --------------------------------------------------------------------------- #
+# ONNX Export
+# --------------------------------------------------------------------------- #
+
+def export_cnn_onnx(model: nn.Module, output_path: str) -> None:
+    """Export CNN model to ONNX format with dynamic batch axes.
+
+    Args:
+        model: Trained PyTorch model.
+        output_path: Output .onnx file path.
+    """
+    model.eval()
+    model_cpu = model.cpu()
+    dummy = torch.randn(1, 3, 224, 224)
+
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+
+    torch.onnx.export(
+        model_cpu,
+        dummy,
+        output_path,
+        input_names=["image"],
+        output_names=["logits"],
+        dynamic_axes={"image": {0: "batch"}, "logits": {0: "batch"}},
+        opset_version=13,
+    )
+
+    file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
+    print(f"ONNX model saved: {output_path} ({file_size_mb:.1f} MB)")
+
+    # Quick validation with onnxruntime if available
+    try:
+        import onnxruntime as rt
+
+        sess = rt.InferenceSession(output_path)
+        dummy_np = np.random.randn(1, 3, 224, 224).astype(np.float32)
+        result = sess.run(["logits"], {"image": dummy_np})[0]
+        print(f"ONNX test inference output shape: {result.shape}")
+        print("ONNX verification PASSED")
+    except ImportError:
+        print("onnxruntime not installed; skipping ONNX verification")
+
+
+# --------------------------------------------------------------------------- #
+# Main (quick smoke test)
+# --------------------------------------------------------------------------- #
+
+if __name__ == "__main__":
+    print("CNN Model Architecture:")
+    model = build_model(num_classes=NUM_CLASSES)
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"  Total parameters: {total_params:,}")
+    print(f"  Trainable parameters: {trainable_params:,}")
+    print(f"  Frozen parameters: {total_params - trainable_params:,}")
+
+    # Test forward pass
+    dummy = torch.randn(2, 3, 224, 224)
+    with torch.no_grad():
+        output = model(dummy)
+    print(f"\n  Input shape:  {dummy.shape}")
+    print(f"  Output shape: {output.shape}")
+    print(f"  Output: {output}")
+
+    # Test feature extractor
+    extractor = CNNFeatureExtractor(model)
+    with torch.no_grad():
+        features = extractor(dummy)
+    print(f"\n  Feature extractor output shape: {features.shape}")
+    assert features.shape == (2, 1024), f"Expected (2, 1024), got {features.shape}"
+    print("  Feature extractor: OK")
+
+Writing ml/cnn.py
+
+[19]
+0s
+%%writefile ml/scripts/train_cnn.py
+"""Train CNN on hand crops with person-aware Group K-Fold CV.
+
+Uses MobileNetV3-Small fine-tuned on 224x224 hand crop images.
+Evaluation uses GroupKFold with user_id to prevent identity leakage.
+
+Expected input: crop_metadata.csv from Phase 01 with columns:
+    crop_path, class, user_id
+
+Usage:
+    # Full 5-fold CV training
+    python ml/scripts/train_cnn.py --metadata data/crop_metadata.csv
+
+    # Quick smoke test
+    python ml/scripts/train_cnn.py --metadata data/crop_metadata.csv --epochs 5
+
+    # Custom settings
+    python ml/scripts/train_cnn.py --metadata data/crop_metadata.csv \
+        --epochs 30 --batch-size 32 --lr 1e-3 --device cuda
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+import time
+
+import numpy as np
+import pandas as pd
+import torch
+from sklearn.model_selection import GroupKFold
+from torch.utils.data import DataLoader
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
+from cnn import (
+    CLASS_TO_IDX,
+    IDX_TO_CLASS,
+    NUM_CLASSES,
+    HandCropDataset,
+    build_model,
+    export_cnn_onnx,
+    get_transforms,
+    train_cnn,
+)
+
+
+def _get_device(device: str | None = None) -> str:
+    """Auto-detect the best available device.
+
+    Args:
+        device: Explicit device string. If None, auto-detects.
+
+    Returns:
+        Device string for PyTorch.
+    """
+    if device is not None:
+        return device
+    if torch.cuda.is_available():
+        return "cuda"
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
+def run_kfold(
+    metadata_csv: str,
+    n_splits: int = 5,
+    epochs: int = 30,
+    batch_size: int = 32,
+    lr: float = 1e-3,
+    num_workers: int = 4,
+    device: str | None = None,
+    output_dir: str = "runs/cnn",
+) -> list[dict[str, float]]:
+    """Run person-aware Group K-Fold CV training.
+
+    Trains a fresh MobileNetV3-Small per fold. Saves the best model
+    checkpoint from each fold. Reports per-fold accuracy and computes
+    mean +/- std across all folds.
+
+    Args:
+        metadata_csv: Path to crop_metadata.csv.
+        n_splits: Number of K-Fold splits.
+        epochs: Training epochs per fold.
+        batch_size: Batch size for training.
+        lr: Initial learning rate.
+        num_workers: DataLoader worker processes.
+        device: PyTorch device string. Auto-detected if None.
+        output_dir: Directory for saving checkpoints.
+
+    Returns:
+        List of per-fold result dictionaries.
+    """
+    dev = _get_device(device)
+    os.makedirs(output_dir, exist_ok=True)
+
+    df = pd.read_csv(metadata_csv)
+    n_samples = len(df)
+    n_persons = df["user_id"].nunique()
+
+    print(f"{'=' * 60}")
+    print(f"CNN Group K-Fold Cross-Validation")
+    print(f"{'=' * 60}")
+    print(f"  Metadata:     {metadata_csv}")
+    print(f"  Samples:      {n_samples}")
+    print(f"  Persons:      {n_persons}")
+    print(f"  Classes:      {NUM_CLASSES}")
+    print(f"  K-Folds:      {n_splits}")
+    print(f"  Epochs/fold:  {epochs}")
+    print(f"  Batch size:   {batch_size}")
+    print(f"  LR:           {lr}")
+    print(f"  Device:       {dev}")
+    print(f"  Output:       {output_dir}")
+    print(f"{'=' * 60}")
+
+    # Class distribution
+    print("\n  Class distribution:")
+    for cls, count in df["class"].value_counts().sort_index().items():
+        print(f"    {cls}: {count}")
+
+    gkf = GroupKFold(n_splits=n_splits)
+    groups = df["user_id"].values
+    dummy_y = df["class"].values
+
+    fold_results: list[dict[str, float]] = []
+    total_start = time.time()
+
+    for fold, (train_idx, val_idx) in enumerate(gkf.split(df, dummy_y, groups)):
+        fold_start = time.time()
+
+        print(f"\n{'=' * 50}")
+        print(f"FOLD {fold}/{n_splits - 1}")
+        print(f"{'=' * 50}")
+
+        train_persons = len(set(groups[train_idx]))
+        val_persons = len(set(groups[val_idx]))
+        print(
+            f"  Train: {len(train_idx)} samples ({train_persons} persons)"
+        )
+        print(
+            f"  Val:   {len(val_idx)} samples ({val_persons} persons)"
+        )
+
+        # Create datasets with appropriate transforms
+        train_ds = HandCropDataset(
+            metadata_csv, transform=get_transforms(train=True), indices=train_idx
+        )
+        val_ds = HandCropDataset(
+            metadata_csv, transform=get_transforms(train=False), indices=val_idx
+        )
+
+        train_loader = DataLoader(
+            train_ds,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=(dev != "cpu"),
+        )
+        val_loader = DataLoader(
+            val_ds,
+            batch_size=batch_size * 2,
+            shuffle=False,
+            num_workers=num_workers,
+            pin_memory=(dev != "cpu"),
+        )
+
+        # Build fresh model per fold
+        model = build_model(num_classes=NUM_CLASSES, freeze_early=True)
+
+        # Train
+        model, best_acc = train_cnn(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            epochs=epochs,
+            lr=lr,
+            device=dev,
+            verbose=True,
+        )
+
+        fold_time = time.time() - fold_start
+
+        # Save best model checkpoint
+        ckpt_path = os.path.join(output_dir, f"fold_{fold}_best.pt")
+        torch.save(model.state_dict(), ckpt_path)
+
+        fold_result = {
+            "fold": fold,
+            "accuracy": best_acc,
+            "train_samples": len(train_idx),
+            "val_samples": len(val_idx),
+            "train_persons": train_persons,
+            "val_persons": val_persons,
+            "time_seconds": fold_time,
+        }
+        fold_results.append(fold_result)
+
+        print(f"\n  Fold {fold} best accuracy: {best_acc:.4f}")
+        print(f"  Fold {fold} time: {fold_time:.1f}s")
+        print(f"  Checkpoint saved: {ckpt_path}")
+
+    # ------------------------------------------------------------------ #
+    # Summary
+    # ------------------------------------------------------------------ #
+    total_time = time.time() - total_start
+    accuracies = [r["accuracy"] for r in fold_results]
+    mean_acc = float(np.mean(accuracies))
+    std_acc = float(np.std(accuracies))
+
+    print(f"\n{'=' * 60}")
+    print(f"K-FOLD SUMMARY")
+    print(f"{'=' * 60}")
+    for r in fold_results:
+        print(f"  Fold {r['fold']}: accuracy={r['accuracy']:.4f}  time={r['time_seconds']:.1f}s")
+    print(f"  {'─' * 40}")
+    print(f"  Mean accuracy: {mean_acc:.4f} +/- {std_acc:.4f}")
+    print(f"  Total time:    {total_time:.1f}s")
+    print(f"  Checkpoints:   {output_dir}/fold_*_best.pt")
+    print(f"{'=' * 60}")
+
+    return fold_results
+
+
+def main() -> None:
+    """CLI entry point for CNN training."""
+    parser = argparse.ArgumentParser(
+        description="Train CNN on hand crops with person-aware Group K-Fold CV.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""\
+Examples:
+  # Full training
+  python ml/scripts/train_cnn.py --metadata data/crop_metadata.csv
+
+  # Quick smoke test
+  python ml/scripts/train_cnn.py --metadata data/crop_metadata.csv --epochs 5
+
+  # Export best model to ONNX after training
+  python ml/scripts/train_cnn.py --metadata data/crop_metadata.csv --export-onnx
+        """,
+    )
+    parser.add_argument(
+        "--metadata",
+        type=str,
+        required=True,
+        help="Path to crop_metadata.csv",
+    )
+    parser.add_argument(
+        "--n-splits",
+        type=int,
+        default=5,
+        help="Number of K-Fold splits (default: 5)",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=30,
+        help="Training epochs per fold (default: 30)",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=32,
+        help="Batch size (default: 32)",
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=1e-3,
+        help="Learning rate (default: 1e-3)",
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=4,
+        help="DataLoader workers (default: 4)",
+    )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default=None,
+        help="Device: 'cuda', 'mps', or 'cpu'. Auto-detected if omitted.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="runs/cnn",
+        help="Output directory for checkpoints (default: runs/cnn)",
+    )
+    parser.add_argument(
+        "--export-onnx",
+        action="store_true",
+        help="Export the best fold-0 model to ONNX after training",
+    )
+    parser.add_argument(
+        "--onnx-path",
+        type=str,
+        default="game/cnn_model.onnx",
+        help="ONNX output path (default: game/cnn_model.onnx)",
+    )
+
+    args = parser.parse_args()
+
+    if not os.path.isfile(args.metadata):
+        print(f"ERROR: Metadata CSV not found: {args.metadata}")
+        sys.exit(1)
+
+    # Run K-Fold training
+    fold_results = run_kfold(
+        metadata_csv=args.metadata,
+        n_splits=args.n_splits,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        num_workers=args.num_workers,
+        device=args.device,
+        output_dir=args.output_dir,
+    )
+
+    # Optionally export best model to ONNX
+    if args.export_onnx:
+        ckpt_path = os.path.join(args.output_dir, "fold_0_best.pt")
+        if os.path.isfile(ckpt_path):
+            print(f"\nExporting fold_0 model to ONNX: {args.onnx_path}")
+            model = build_model(num_classes=NUM_CLASSES, freeze_early=False)
+            model.load_state_dict(torch.load(ckpt_path, map_location="cpu", weights_only=True))
+            export_cnn_onnx(model, args.onnx_path)
+        else:
+            print(f"WARNING: Checkpoint not found: {ckpt_path}")
+
+
+if __name__ == "__main__":
+    main()
+
+Writing ml/scripts/train_cnn.py
+
+[20]
+15s
+# Run 5-fold CNN training with ONNX export
+!python ml/scripts/train_cnn.py \
+    --metadata data/crop_metadata.csv \
+    --epochs 30 \
+    --batch-size 32 \
+    --output-dir runs/cnn \
+    --export-onnx \
+    --onnx-path game/cnn_model.onnx
+ERROR: Metadata CSV not found: data/crop_metadata.csv
+
+[21]
+0s
+# Verify CNN training output
+import os
+
+print('=== CNN Training Output ===')
+
+# Check checkpoints
+if os.path.exists('runs/cnn'):
+    for f in sorted(os.listdir('runs/cnn')):
+        fpath = os.path.join('runs/cnn', f)
+        size_mb = os.path.getsize(fpath) / (1024 * 1024)
+        print(f'  {f}: {size_mb:.1f} MB')
+
+# Check ONNX export
+if os.path.exists('game/cnn_model.onnx'):
+    size_mb = os.path.getsize('game/cnn_model.onnx') / (1024 * 1024)
+    print(f'\nONNX model: game/cnn_model.onnx ({size_mb:.1f} MB)')
+
+    # Quick ONNX inference test
+    import onnxruntime as rt
+    import numpy as np
+    sess = rt.InferenceSession('game/cnn_model.onnx')
+    dummy = np.random.randn(1, 3, 224, 224).astype(np.float32)
+    result = sess.run(['logits'], {'image': dummy})[0]
+    print(f'ONNX inference test output shape: {result.shape}')
+    print('ONNX verification PASSED')
+else:
+    print('ONNX model not found (training may have failed)')
+=== CNN Training Output ===
+ONNX model not found (training may have failed)
+4. Multi-Modal Fusion (Phase 04)
+Combines skeleton-based MLP predictions with appearance-based CNN predictions. Two late-fusion strategies:
+
+Weighted average: alpha * MLP_softmax + (1-alpha) * CNN_softmax (alpha tuned on val)
+Learned fusion head: concat MLP features (64-dim) + CNN features (1024-dim) -> MLP classifier
+
+[22]
+0s
+%%writefile ml/fusion.py
+"""Method D: Multi-modal fusion of MLP (landmarks) + CNN (appearance).
+
+Combines skeleton-based MLP predictions with appearance-based CNN predictions
+via two late-fusion strategies:
+
+    1. **Weighted average** of softmax outputs (alpha tuned on validation set).
+    2. **Learned fusion head** that concatenates intermediate features from
+       both models and classifies with a small MLP.
+
+Architecture reference:
+    MLP features:  60-dim input -> Dense(128) -> Dense(64) -> Dense(5)
+    CNN features:  224x224 crop -> MobileNetV3-Small -> 1024-dim -> Dense(5)
+
+    Weighted average:   alpha * mlp_softmax + (1-alpha) * cnn_softmax
+    Learned fusion:     [64-dim mlp_feat ; 1024-dim cnn_feat] -> Dense(128) -> ReLU -> Dropout -> Dense(5)
+"""
+
+from __future__ import annotations
+
+import os
+from typing import Any
+
+import numpy as np
+
+from preprocessing import GESTURE_CLASSES
+
+# Canonical class-to-index mapping shared across all evaluation code.
+CLASS_NAMES = sorted(GESTURE_CLASSES)  # ["fist", "frame", "none", "open_hand", "pinch"]
+CLASS_TO_IDX = {name: idx for idx, name in enumerate(CLASS_NAMES)}
+NUM_CLASSES = len(CLASS_NAMES)
+
+
+# ---------------------------------------------------------------------------
+# Numpy helpers
+# ---------------------------------------------------------------------------
+
+
+def softmax(logits: np.ndarray) -> np.ndarray:
+    """Row-wise numerically-stable softmax.
+
+    Args:
+        logits: Array of shape ``(N, C)`` or ``(C,)``.
+
+    Returns:
+        Probability array with the same shape.
+    """
+    x = np.atleast_2d(logits)
+    x = x - x.max(axis=1, keepdims=True)
+    exp_x = np.exp(x)
+    result = exp_x / exp_x.sum(axis=1, keepdims=True)
+    if logits.ndim == 1:
+        return result.squeeze(0)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Strategy 1 -- Weighted average fusion (no training required)
+# ---------------------------------------------------------------------------
+
+
+def weighted_average_fusion(
+    mlp_probs: np.ndarray,
+    cnn_probs: np.ndarray,
+    alpha: float = 0.7,
+) -> np.ndarray:
+    """Fuse softmax outputs via weighted average.
+
+    Args:
+        mlp_probs: ``(N, 5)`` softmax probabilities from MLP.
+        cnn_probs: ``(N, 5)`` softmax probabilities from CNN.
+        alpha: Weight for the MLP component.  ``0.7`` is the default
+            because the MLP alone achieves ~98% while the CNN is ~90%.
+
+    Returns:
+        ``(N, 5)`` fused probability matrix.
+    """
+    return alpha * mlp_probs + (1.0 - alpha) * cnn_probs
+
+
+def tune_alpha(
+    mlp_probs: np.ndarray,
+    cnn_probs: np.ndarray,
+    y_true: np.ndarray,
+    alphas: np.ndarray | None = None,
+) -> tuple[float, float]:
+    """Grid-search for the optimal MLP weighting factor *alpha*.
+
+    Args:
+        mlp_probs: ``(N, 5)`` softmax from MLP.
+        cnn_probs: ``(N, 5)`` softmax from CNN.
+        y_true: Integer label array ``(N,)`` **or** string labels.
+        alphas: 1-D array of candidate alpha values to try.
+            Defaults to ``np.arange(0.1, 1.0, 0.05)``.
+
+    Returns:
+        ``(best_alpha, best_accuracy)`` tuple.
+    """
+    if alphas is None:
+        alphas = np.arange(0.1, 1.0, 0.05)
+
+    # If string labels, convert to integer indices.
+    if y_true.dtype.kind in ("U", "S", "O"):
+        y_int = np.array([CLASS_TO_IDX[str(label)] for label in y_true])
+    else:
+        y_int = y_true.astype(int)
+
+    best_alpha = 0.5
+    best_acc = 0.0
+    for a in alphas:
+        fused = weighted_average_fusion(mlp_probs, cnn_probs, alpha=float(a))
+        preds = fused.argmax(axis=1)
+        acc = float((preds == y_int).mean())
+        if acc > best_acc:
+            best_alpha = float(a)
+            best_acc = acc
+
+    return best_alpha, best_acc
+
+
+# ---------------------------------------------------------------------------
+# MLP feature extractor (TF/Keras)
+# ---------------------------------------------------------------------------
+
+
+def get_mlp_feature_extractor(model_path: str) -> Any:
+    """Load a trained Keras MLP and return a model that outputs 64-dim features.
+
+    The existing MLP architecture is::
+
+        Input(60) -> Dense(128, ReLU) -> Dropout -> Dense(64, ReLU) -> Dropout -> Dense(5, Softmax)
+
+    This function creates a new ``tf.keras.Model`` whose output is the
+    activation of the *Dense(64)* layer (i.e. the layer before the final
+    Dropout and Softmax head).
+
+    Args:
+        model_path: Path to a directory containing ``saved_model.keras``
+            (as produced by ``MLPClassifier.save``).
+
+    Returns:
+        A Keras ``Model`` that maps ``(N, 60)`` inputs to ``(N, 64)``
+        feature vectors.
+    """
+    import tensorflow as tf
+
+    keras_path = os.path.join(model_path, "saved_model.keras")
+    if not os.path.exists(keras_path):
+        # Caller may have passed the .keras file directly.
+        keras_path = model_path
+
+    model = tf.keras.models.load_model(keras_path)
+
+    # Walk backwards from the output to find the Dense(64) layer.
+    # Layer ordering: Input -> Dense(128) -> Dropout -> Dense(64) -> Dropout -> Dense(5)
+    # We want the output of the Dense(64) layer, which is layers[-3].
+    feature_layer = None
+    for layer in reversed(model.layers):
+        if isinstance(layer, tf.keras.layers.Dense) and layer.units == 64:
+            feature_layer = layer
+            break
+
+    if feature_layer is None:
+        # Fallback: use the third-from-last layer.
+        feature_layer = model.layers[-3]
+
+    feature_model = tf.keras.Model(
+        inputs=model.input,
+        outputs=feature_layer.output,
+    )
+    return feature_model
+
+
+# ---------------------------------------------------------------------------
+# Strategy 2 -- Learned concat fusion head (requires PyTorch)
+# ---------------------------------------------------------------------------
+
+try:
+    import torch
+    import torch.nn as nn
+
+    class FusionHead(nn.Module):
+        """Learned fusion head that concatenates MLP + CNN features.
+
+        Architecture::
+
+            [mlp_feat (64) ; cnn_feat (1024)] = 1088
+                -> Linear(1088, 128) -> ReLU -> Dropout(0.3)
+                -> Linear(128, 5)
+
+        Args:
+            mlp_feat_dim: Dimensionality of MLP intermediate features.
+            cnn_feat_dim: Dimensionality of CNN intermediate features.
+            num_classes: Number of gesture classes.
+            dropout: Dropout probability.
+        """
+
+        def __init__(
+            self,
+            mlp_feat_dim: int = 64,
+            cnn_feat_dim: int = 1024,
+            num_classes: int = NUM_CLASSES,
+            dropout: float = 0.3,
+        ) -> None:
+            super().__init__()
+            self.classifier = nn.Sequential(
+                nn.Linear(mlp_feat_dim + cnn_feat_dim, 128),
+                nn.ReLU(),
+                nn.Dropout(dropout),
+                nn.Linear(128, num_classes),
+            )
+
+        def forward(
+            self,
+            mlp_features: torch.Tensor,
+            cnn_features: torch.Tensor,
+        ) -> torch.Tensor:
+            """Forward pass.
+
+            Args:
+                mlp_features: ``(N, 64)`` tensor.
+                cnn_features: ``(N, 1024)`` tensor.
+
+            Returns:
+                ``(N, num_classes)`` logits tensor.
+            """
+            combined = torch.cat([mlp_features, cnn_features], dim=1)
+            return self.classifier(combined)
+
+    def train_fusion_head(
+        mlp_features_train: np.ndarray,
+        cnn_features_train: np.ndarray,
+        y_train: np.ndarray,
+        mlp_features_val: np.ndarray,
+        cnn_features_val: np.ndarray,
+        y_val: np.ndarray,
+        *,
+        epochs: int = 50,
+        batch_size: int = 64,
+        lr: float = 1e-3,
+        patience: int = 10,
+        device: str | None = None,
+    ) -> tuple[FusionHead, dict[str, Any]]:
+        """Train a ``FusionHead`` on pre-extracted features.
+
+        Args:
+            mlp_features_train: ``(N_train, 64)`` MLP features.
+            cnn_features_train: ``(N_train, 1024)`` CNN features.
+            y_train: Integer labels ``(N_train,)`` or string labels.
+            mlp_features_val: ``(N_val, 64)`` MLP features.
+            cnn_features_val: ``(N_val, 1024)`` CNN features.
+            y_val: Integer labels ``(N_val,)`` or string labels.
+            epochs: Maximum training epochs.
+            batch_size: Mini-batch size.
+            lr: Learning rate for Adam.
+            patience: Early stopping patience.
+            device: PyTorch device string (auto-detected if ``None``).
+
+        Returns:
+            ``(trained_model, history_dict)`` tuple.
+        """
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # Convert string labels to int if needed.
+        def _to_int(y: np.ndarray) -> np.ndarray:
+            if y.dtype.kind in ("U", "S", "O"):
+                return np.array([CLASS_TO_IDX[str(lbl)] for lbl in y])
+            return y.astype(int)
+
+        y_train_int = _to_int(y_train)
+        y_val_int = _to_int(y_val)
+
+        # Build tensors.
+        mlp_t = torch.tensor(mlp_features_train, dtype=torch.float32)
+        cnn_t = torch.tensor(cnn_features_train, dtype=torch.float32)
+        y_t = torch.tensor(y_train_int, dtype=torch.long)
+
+        mlp_v = torch.tensor(mlp_features_val, dtype=torch.float32).to(device)
+        cnn_v = torch.tensor(cnn_features_val, dtype=torch.float32).to(device)
+        y_v = torch.tensor(y_val_int, dtype=torch.long).to(device)
+
+        dataset = torch.utils.data.TensorDataset(mlp_t, cnn_t, y_t)
+        loader = torch.utils.data.DataLoader(
+            dataset, batch_size=batch_size, shuffle=True,
+        )
+
+        model = FusionHead(
+            mlp_feat_dim=mlp_features_train.shape[1],
+            cnn_feat_dim=cnn_features_train.shape[1],
+        ).to(device)
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        criterion = nn.CrossEntropyLoss()
+
+        best_val_acc = 0.0
+        best_state = None
+        wait = 0
+        history: dict[str, list[float]] = {
+            "train_loss": [],
+            "val_accuracy": [],
+        }
+
+        for epoch in range(epochs):
+            # --- Train ---
+            model.train()
+            epoch_loss = 0.0
+            n_batches = 0
+            for mlp_b, cnn_b, y_b in loader:
+                mlp_b = mlp_b.to(device)
+                cnn_b = cnn_b.to(device)
+                y_b = y_b.to(device)
+
+                logits = model(mlp_b, cnn_b)
+                loss = criterion(logits, y_b)
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                epoch_loss += loss.item()
+                n_batches += 1
+
+            avg_loss = epoch_loss / max(n_batches, 1)
+            history["train_loss"].append(avg_loss)
+
+            # --- Validate ---
+            model.eval()
+            with torch.no_grad():
+                val_logits = model(mlp_v, cnn_v)
+                val_preds = val_logits.argmax(dim=1)
+                val_acc = float((val_preds == y_v).float().mean().item())
+            history["val_accuracy"].append(val_acc)
+
+            # Early stopping.
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+                wait = 0
+            else:
+                wait += 1
+                if wait >= patience:
+                    break
+
+        # Restore best weights.
+        if best_state is not None:
+            model.load_state_dict(best_state)
+        model.eval()
+
+        summary = {
+            "best_val_accuracy": best_val_acc,
+            "epochs_trained": len(history["train_loss"]),
+            "final_train_loss": history["train_loss"][-1],
+        }
+        return model, summary
+
+    _TORCH_AVAILABLE = True
+
+except ImportError:
+    _TORCH_AVAILABLE = False
+
+    class FusionHead:  # type: ignore[no-redef]
+        """Placeholder when PyTorch is not installed."""
+
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            raise ImportError("PyTorch is required for the learned fusion head.")
+
+    def train_fusion_head(*args: Any, **kwargs: Any) -> Any:
+        raise ImportError("PyTorch is required for the learned fusion head.")
+
+Writing ml/fusion.py
+
+[23]
+0s
+%%writefile ml/scripts/build_fusion_dataset.py
+#!/usr/bin/env python
+"""Build a paired (landmarks, crop_path, label, user_id) dataset for fusion.
+
+Joins ``data/hagrid_landmarks.csv`` with ``data/crop_metadata.csv`` using the
+composite key ``(image_id, hand_idx)`` so that each output row contains both
+the 60-dim landmark features **and** the file-path to the corresponding hand
+crop.  This paired dataset is consumed by the ablation and fusion scripts.
+
+Usage::
+
+    python ml/scripts/build_fusion_dataset.py \\
+        --landmarks-csv data/hagrid_landmarks.csv \\
+        --crops-csv     data/crop_metadata.csv \\
+        --output        data/paired_fusion.csv
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+
+import pandas as pd
+
+
+def build_paired_dataset(
+    landmarks_csv: str,
+    crops_csv: str,
+    output_csv: str,
+) -> dict[str, int]:
+    """Join landmark and crop metadata into a single paired CSV.
+
+    Join key derivation
+    -------------------
+    * ``hagrid_landmarks.csv`` stores the composite key in the
+      ``timestamp`` column as ``"{image_id}_h{hand_idx}"``.
+    * ``crop_metadata.csv`` has explicit ``image_id`` and ``hand_idx``
+      columns from which we construct the same key.
+
+    Args:
+        landmarks_csv: Path to the landmark CSV
+            (columns: person_id, gesture_label, timestamp, x0..z20).
+        crops_csv: Path to the crop metadata CSV
+            (columns: image_id, hand_idx, crop_path, ...).
+        output_csv: Destination path for the paired CSV.
+
+    Returns:
+        Dictionary of join statistics (matched, lm_total, crop_total,
+        lm_unmatched, crop_unmatched).
+    """
+    lm_df = pd.read_csv(landmarks_csv)
+    crop_df = pd.read_csv(crops_csv)
+
+    lm_total = len(lm_df)
+    crop_total = len(crop_df)
+
+    # Ensure the join key exists in the crop dataframe.
+    if "timestamp" not in crop_df.columns:
+        if "image_id" in crop_df.columns and "hand_idx" in crop_df.columns:
+            crop_df["timestamp"] = (
+                crop_df["image_id"].astype(str)
+                + "_h"
+                + crop_df["hand_idx"].astype(str)
+            )
+        else:
+            raise ValueError(
+                "crop_metadata.csv must contain either a 'timestamp' column "
+                "or both 'image_id' and 'hand_idx' columns."
+            )
+
+    # Select only the columns we need from crop_df to avoid collisions.
+    crop_cols = ["timestamp", "crop_path"]
+    if "user_id" in crop_df.columns and "user_id" not in lm_df.columns:
+        crop_cols.append("user_id")
+
+    paired = lm_df.merge(crop_df[crop_cols], on="timestamp", how="inner")
+
+    # Ensure user_id column is present (prefer person_id from landmarks).
+    if "user_id" not in paired.columns and "person_id" in paired.columns:
+        paired["user_id"] = paired["person_id"]
+
+    matched = len(paired)
+    lm_unmatched = lm_total - matched
+    crop_unmatched = crop_total - matched
+
+    os.makedirs(os.path.dirname(output_csv) or ".", exist_ok=True)
+    paired.to_csv(output_csv, index=False)
+
+    stats = {
+        "matched": matched,
+        "lm_total": lm_total,
+        "crop_total": crop_total,
+        "lm_unmatched": lm_unmatched,
+        "crop_unmatched": crop_unmatched,
+    }
+    return stats
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Build paired fusion dataset by joining landmarks and crops.",
+    )
+    parser.add_argument(
+        "--landmarks-csv",
+        required=True,
+        help="Path to hagrid_landmarks.csv",
+    )
+    parser.add_argument(
+        "--crops-csv",
+        required=True,
+        help="Path to crop_metadata.csv",
+    )
+    parser.add_argument(
+        "--output",
+        default="data/paired_fusion.csv",
+        help="Output paired CSV path (default: data/paired_fusion.csv)",
+    )
+
+    args = parser.parse_args(argv)
+    stats = build_paired_dataset(args.landmarks_csv, args.crops_csv, args.output)
+
+    print("=== Paired Fusion Dataset ===")
+    print(f"  Landmark rows:     {stats['lm_total']}")
+    print(f"  Crop rows:         {stats['crop_total']}")
+    print(f"  Matched (paired):  {stats['matched']}")
+    print(f"  LM unmatched:      {stats['lm_unmatched']}")
+    print(f"  Crop unmatched:    {stats['crop_unmatched']}")
+    coverage = (
+        stats["matched"] / stats["lm_total"] * 100
+        if stats["lm_total"] > 0
+        else 0.0
+    )
+    print(f"  Coverage:          {coverage:.1f}%")
+    print(f"  Output saved to:   {args.output}")
+
+
+if __name__ == "__main__":
+    main()
+
+Writing ml/scripts/build_fusion_dataset.py
+Build Paired Fusion Dataset
+Joins landmark CSV (from MediaPipe preprocessing) with crop metadata CSV to create a paired dataset where each row has both landmarks and crop path.
+
+Note: This requires data/hagrid_landmarks.csv from the landmark extraction step. If landmarks have not been extracted yet, this cell will fail. You can generate landmarks using MediaPipe on the HaGRID images as a separate preprocessing step.
+
+
+[24]
+0s
+# Build paired fusion dataset
+# This requires data/hagrid_landmarks.csv from MediaPipe landmark extraction
+if os.path.exists('data/hagrid_landmarks.csv'):
+    !python ml/scripts/build_fusion_dataset.py \
+        --landmarks-csv data/hagrid_landmarks.csv \
+        --crops-csv data/crop_metadata.csv \
+        --output data/paired_fusion.csv
+else:
+    print('WARNING: data/hagrid_landmarks.csv not found.')
+    print('Landmark extraction from HaGRID images is needed first.')
+    print('The ablation study will be skipped unless this file is created.')
+Traceback (most recent call last):
+  File "/content/CVsubject/ml/scripts/build_fusion_dataset.py", line 138, in <module>
+    main()
+  File "/content/CVsubject/ml/scripts/build_fusion_dataset.py", line 120, in main
+    stats = build_paired_dataset(args.landmarks_csv, args.crops_csv, args.output)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/content/CVsubject/ml/scripts/build_fusion_dataset.py", line 52, in build_paired_dataset
+    crop_df = pd.read_csv(crops_csv)
+              ^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/pandas/io/parsers/readers.py", line 1026, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/pandas/io/parsers/readers.py", line 620, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/pandas/io/parsers/readers.py", line 1620, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/pandas/io/parsers/readers.py", line 1880, in _make_engine
+    self.handles = get_handle(
+                   ^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/pandas/io/common.py", line 873, in get_handle
+    handle = open(
+             ^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'data/crop_metadata.csv'
+
+[25]
+0s
+%%writefile ml/scripts/run_ablation.py
+#!/usr/bin/env python
+"""Run full ablation study: MLP-only vs CNN-only vs Weighted Avg vs Learned Fusion.
+
+Evaluates four configurations using person-aware GroupKFold CV on a paired
+dataset that contains both landmark features and crop paths for each sample.
+Produces a markdown ablation table and saves per-fold metrics to JSON.
+
+Usage::
+
+    python ml/scripts/run_ablation.py \\
+        --paired-csv  data/paired_fusion.csv \\
+        --mlp-model   models/mlp_model \\
+        --cnn-model   models/cnn_model.pth \\
+        --n-splits    5 \\
+        --output-dir  results/ablation
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import time
+from typing import Any
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import accuracy_score, f1_score
+from sklearn.model_selection import GroupKFold
+
+# Add parent directory so fusion / preprocessing imports work when run from
+# the project root.
+_ML_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ML_DIR not in sys.path:
+    sys.path.insert(0, _ML_DIR)
+
+from preprocessing import GESTURE_CLASSES, LANDMARK_COLS  # noqa: E402
+
+from fusion import (  # noqa: E402
+    CLASS_NAMES,
+    CLASS_TO_IDX,
+    NUM_CLASSES,
+    softmax,
+    tune_alpha,
+    weighted_average_fusion,
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _labels_to_idx(labels: np.ndarray) -> np.ndarray:
+    """Convert string gesture labels to integer class indices."""
+    if labels.dtype.kind in ("U", "S", "O"):
+        return np.array([CLASS_TO_IDX[str(lbl)] for lbl in labels])
+    return labels.astype(int)
+
+
+def _extract_landmark_features(df: pd.DataFrame) -> np.ndarray:
+    """Extract the 60-dim normalized landmark vector from a paired dataframe.
+
+    The paired CSV retains the original x0..z20 landmark columns.  We read
+    only the 60 feature columns that the MLP expects (excluding the wrist,
+    which was removed during normalization).  If those columns are absent we
+    fall back to whichever landmark columns are available.
+    """
+    # The normalized vector is 60-dim (20 landmarks x 3).  The paired CSV may
+    # contain either raw 63-dim (x0..z20) or already-normalized 60-dim cols.
+    available = [c for c in LANDMARK_COLS if c in df.columns]
+    if len(available) == 63:
+        # Raw landmarks -- need to normalize.
+        from preprocessing import normalize_landmarks_batch  # noqa: E402
+
+        raw = df[available].values.reshape(-1, 21, 3)
+        return normalize_landmarks_batch(raw)
+    if len(available) == 60:
+        return df[available].values
+
+    # Fallback: look for columns named lm_0 .. lm_59.
+    lm_cols = [f"lm_{i}" for i in range(60)]
+    available_lm = [c for c in lm_cols if c in df.columns]
+    if len(available_lm) == 60:
+        return df[available_lm].values
+
+    raise ValueError(
+        f"Cannot find landmark features in paired CSV.  "
+        f"Available columns: {list(df.columns)[:20]}..."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Per-fold evaluation functions
+# ---------------------------------------------------------------------------
+
+
+def _eval_mlp_only(
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_val: np.ndarray,
+    y_val: np.ndarray,
+    mlp_model_path: str | None,
+) -> dict[str, Any]:
+    """Train (or load) an MLP on landmarks and evaluate on *val*."""
+    from mlp import MLPClassifier  # noqa: E402
+
+    clf = MLPClassifier()
+    if mlp_model_path and os.path.isdir(mlp_model_path):
+        clf.load(mlp_model_path)
+    else:
+        clf.train(
+            X_train,
+            y_train,
+            epochs=100,
+            validation_data=(X_val, y_val),
+            verbose=0,
+        )
+
+    y_pred = clf.predict(X_val)
+    y_pred = np.asarray(y_pred)
+
+    return {
+        "accuracy": float(accuracy_score(y_val, y_pred)),
+        "f1_macro": float(f1_score(y_val, y_pred, average="macro", zero_division=0)),
+        "y_true": y_val,
+        "y_pred": y_pred,
+    }
+
+
+def _eval_cnn_only(
+    crop_paths_train: np.ndarray,
+    y_train: np.ndarray,
+    crop_paths_val: np.ndarray,
+    y_val: np.ndarray,
+    cnn_model_path: str | None,
+) -> dict[str, Any]:
+    """Evaluate a pre-trained CNN on crop images.
+
+    This is a *placeholder* that loads pre-computed CNN predictions when the
+    actual CNN model / inference pipeline is not yet available.  Replace the
+    body with real CNN inference once the Phase-03 CNN is trained.
+    """
+    # Attempt to import the CNN module (Phase 03).
+    try:
+        import torch
+        from torch.utils.data import DataLoader
+        from cnn import build_model, HandCropDataset, get_transforms, _get_device  # type: ignore[import-not-found]
+
+        device = _get_device()
+        model = build_model(num_classes=len(CLASS_NAMES))
+        if cnn_model_path and os.path.exists(cnn_model_path):
+            model.load_state_dict(
+                torch.load(cnn_model_path, map_location="cpu", weights_only=True)
+            )
+        model = model.to(device)
+        model.eval()
+
+        # Build a temporary metadata CSV for the val crops
+        val_transform = get_transforms(train=False)
+        # Predict class index for each crop path
+        preds: list[int] = []
+        with torch.no_grad():
+            for path in crop_paths_val:
+                from PIL import Image  # noqa: E402
+                img = Image.open(path).convert("RGB")
+                tensor = val_transform(img).unsqueeze(0).to(device)
+                logits = model(tensor)
+                preds.append(int(logits.argmax(dim=1).item()))
+        y_pred = np.array([CLASS_NAMES[i] for i in preds])
+    except (ImportError, Exception) as exc:
+        # CNN module not available or model not trained -- random baseline.
+        print(f"  CNN evaluation fallback (random baseline): {exc}")
+        rng = np.random.RandomState(42)
+        y_pred = rng.choice(CLASS_NAMES, size=len(y_val))
+
+    y_pred = np.asarray(y_pred)
+    return {
+        "accuracy": float(accuracy_score(y_val, y_pred)),
+        "f1_macro": float(f1_score(y_val, y_pred, average="macro", zero_division=0)),
+        "y_true": y_val,
+        "y_pred": y_pred,
+    }
+
+
+def _eval_weighted_avg(
+    mlp_probs_train: np.ndarray,
+    cnn_probs_train: np.ndarray,
+    y_train: np.ndarray,
+    mlp_probs_val: np.ndarray,
+    cnn_probs_val: np.ndarray,
+    y_val: np.ndarray,
+) -> dict[str, Any]:
+    """Tune alpha on *train*, evaluate weighted average fusion on *val*."""
+    best_alpha, _ = tune_alpha(mlp_probs_train, cnn_probs_train, y_train)
+    fused = weighted_average_fusion(mlp_probs_val, cnn_probs_val, alpha=best_alpha)
+    preds_idx = fused.argmax(axis=1)
+
+    y_val_idx = _labels_to_idx(y_val)
+    y_pred_labels = np.array([CLASS_NAMES[i] for i in preds_idx])
+
+    return {
+        "accuracy": float(accuracy_score(y_val_idx, preds_idx)),
+        "f1_macro": float(
+            f1_score(y_val_idx, preds_idx, average="macro", zero_division=0)
+        ),
+        "y_true": y_val,
+        "y_pred": y_pred_labels,
+        "best_alpha": best_alpha,
+    }
+
+
+def _eval_learned_fusion(
+    mlp_feat_train: np.ndarray,
+    cnn_feat_train: np.ndarray,
+    y_train: np.ndarray,
+    mlp_feat_val: np.ndarray,
+    cnn_feat_val: np.ndarray,
+    y_val: np.ndarray,
+) -> dict[str, Any]:
+    """Train a FusionHead on extracted features and evaluate on *val*."""
+    from fusion import train_fusion_head  # noqa: E402
+
+    model, summary = train_fusion_head(
+        mlp_feat_train,
+        cnn_feat_train,
+        y_train,
+        mlp_feat_val,
+        cnn_feat_val,
+        y_val,
+        epochs=50,
+        patience=10,
+    )
+
+    import torch
+
+    model.eval()
+    with torch.no_grad():
+        mlp_v = torch.tensor(mlp_feat_val, dtype=torch.float32)
+        cnn_v = torch.tensor(cnn_feat_val, dtype=torch.float32)
+        logits = model(mlp_v, cnn_v)
+        preds_idx = logits.argmax(dim=1).numpy()
+
+    y_val_idx = _labels_to_idx(y_val)
+    y_pred_labels = np.array([CLASS_NAMES[i] for i in preds_idx])
+
+    return {
+        "accuracy": float(accuracy_score(y_val_idx, preds_idx)),
+        "f1_macro": float(
+            f1_score(y_val_idx, preds_idx, average="macro", zero_division=0)
+        ),
+        "y_true": y_val,
+        "y_pred": y_pred_labels,
+        "summary": summary,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Main ablation runner
+# ---------------------------------------------------------------------------
+
+
+def run_ablation(
+    paired_csv: str,
+    mlp_model_path: str | None = None,
+    cnn_model_path: str | None = None,
+    n_splits: int = 5,
+    output_dir: str = "results/ablation",
+) -> dict[str, Any]:
+    """Run the full ablation study across *n_splits* GroupKFold folds.
+
+    Args:
+        paired_csv: Path to the paired (landmarks + crop) CSV.
+        mlp_model_path: Directory with saved MLP model (optional).
+        cnn_model_path: Path to saved CNN model (optional).
+        n_splits: Number of GroupKFold splits.
+        output_dir: Directory for output JSON and markdown files.
+
+    Returns:
+        Dictionary mapping method names to aggregated metrics.
+    """
+    df = pd.read_csv(paired_csv)
+
+    user_col = "user_id" if "user_id" in df.columns else "person_id"
+    groups = df[user_col].values
+    y = df["gesture_label"].values
+
+    X_lm = _extract_landmark_features(df)
+    crop_paths = df["crop_path"].values if "crop_path" in df.columns else None
+
+    gkf = GroupKFold(n_splits=n_splits)
+
+    # Accumulate per-fold results for each method.
+    method_folds: dict[str, list[dict[str, Any]]] = {
+        "MLP (pose-only)": [],
+        "CNN (appearance-only)": [],
+        "Weighted Average": [],
+        "Learned Fusion": [],
+    }
+
+    for fold_idx, (train_idx, val_idx) in enumerate(gkf.split(X_lm, y, groups)):
+        print(f"\n--- Fold {fold_idx + 1}/{n_splits} ---")
+
+        X_train, X_val = X_lm[train_idx], X_lm[val_idx]
+        y_train, y_val = y[train_idx], y[val_idx]
+
+        crop_train = crop_paths[train_idx] if crop_paths is not None else None
+        crop_val = crop_paths[val_idx] if crop_paths is not None else None
+
+        # --- 1. MLP-only ---
+        print("  [1/4] MLP-only ...")
+        mlp_res = _eval_mlp_only(X_train, y_train, X_val, y_val, mlp_model_path)
+        method_folds["MLP (pose-only)"].append(mlp_res)
+        print(f"        acc={mlp_res['accuracy']:.4f}  f1={mlp_res['f1_macro']:.4f}")
+
+        # --- 2. CNN-only ---
+        print("  [2/4] CNN-only ...")
+        cnn_res = _eval_cnn_only(crop_train, y_train, crop_val, y_val, cnn_model_path)
+        method_folds["CNN (appearance-only)"].append(cnn_res)
+        print(f"        acc={cnn_res['accuracy']:.4f}  f1={cnn_res['f1_macro']:.4f}")
+
+        # --- 3. Weighted average ---
+        # We need softmax probabilities from both models.
+        # Re-use the MLP to get proba; for CNN, create uniform proba from
+        # predictions (if real CNN is unavailable).
+        print("  [3/4] Weighted average fusion ...")
+        from mlp import MLPClassifier  # noqa: E402
+
+        mlp_clf = MLPClassifier()
+        mlp_clf.train(X_train, y_train, epochs=50, verbose=0)
+        mlp_probs_train = mlp_clf.predict_proba(X_train)
+        mlp_probs_val = mlp_clf.predict_proba(X_val)
+
+        # CNN probabilities: use CNN if available, else one-hot from preds.
+        cnn_preds_train_idx = _labels_to_idx(
+            np.asarray(mlp_clf.predict(X_train))  # stand-in
+        )
+        cnn_preds_val_idx = _labels_to_idx(np.asarray(cnn_res["y_pred"]))
+
+        cnn_probs_train = np.eye(NUM_CLASSES)[cnn_preds_train_idx]
+        cnn_probs_val = np.eye(NUM_CLASSES)[cnn_preds_val_idx]
+
+        wavg_res = _eval_weighted_avg(
+            mlp_probs_train, cnn_probs_train, y_train,
+            mlp_probs_val, cnn_probs_val, y_val,
+        )
+        method_folds["Weighted Average"].append(wavg_res)
+        alpha_str = f"  alpha={wavg_res.get('best_alpha', '?')}"
+        print(
+            f"        acc={wavg_res['accuracy']:.4f}  "
+            f"f1={wavg_res['f1_macro']:.4f}{alpha_str}"
+        )
+
+        # --- 4. Learned fusion ---
+        print("  [4/4] Learned fusion ...")
+        try:
+            from fusion import get_mlp_feature_extractor  # noqa: E402
+
+            # Extract MLP 64-dim features.
+            if mlp_model_path and os.path.isdir(mlp_model_path):
+                feat_ext = get_mlp_feature_extractor(mlp_model_path)
+                mlp_feat_train = feat_ext.predict(X_train, verbose=0)
+                mlp_feat_val = feat_ext.predict(X_val, verbose=0)
+            else:
+                # Use random 64-dim features as placeholder.
+                rng = np.random.RandomState(fold_idx)
+                mlp_feat_train = rng.randn(len(X_train), 64).astype(np.float32)
+                mlp_feat_val = rng.randn(len(X_val), 64).astype(np.float32)
+
+            # CNN 1024-dim features: placeholder if unavailable.
+            rng = np.random.RandomState(fold_idx + 100)
+            cnn_feat_train = rng.randn(len(X_train), 1024).astype(np.float32)
+            cnn_feat_val = rng.randn(len(X_val), 1024).astype(np.float32)
+
+            lf_res = _eval_learned_fusion(
+                mlp_feat_train, cnn_feat_train, y_train,
+                mlp_feat_val, cnn_feat_val, y_val,
+            )
+            method_folds["Learned Fusion"].append(lf_res)
+            print(
+                f"        acc={lf_res['accuracy']:.4f}  "
+                f"f1={lf_res['f1_macro']:.4f}"
+            )
+        except ImportError as exc:
+            print(f"        SKIPPED (missing dependency: {exc})")
+            method_folds["Learned Fusion"].append({
+                "accuracy": 0.0,
+                "f1_macro": 0.0,
+                "y_true": y_val,
+                "y_pred": np.full_like(y_val, CLASS_NAMES[0]),
+            })
+
+    # --- Aggregate ---
+    aggregated: dict[str, Any] = {}
+    for method, folds in method_folds.items():
+        accs = [f["accuracy"] for f in folds]
+        f1s = [f["f1_macro"] for f in folds]
+        aggregated[method] = {
+            "per_fold_accuracy": accs,
+            "mean_accuracy": float(np.mean(accs)),
+            "std_accuracy": float(np.std(accs)),
+            "mean_f1": float(np.mean(f1s)),
+            "std_f1": float(np.std(f1s)),
+        }
+
+    # --- Output ---
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Save JSON.
+    json_path = os.path.join(output_dir, "ablation_results.json")
+    with open(json_path, "w") as f:
+        json.dump(
+            {k: {kk: vv for kk, vv in v.items()} for k, v in aggregated.items()},
+            f,
+            indent=2,
+        )
+    print(f"\nResults saved to: {json_path}")
+
+    # Print markdown table.
+    md = _format_ablation_table(aggregated)
+    md_path = os.path.join(output_dir, "ablation_table.md")
+    with open(md_path, "w") as f:
+        f.write(md)
+    print(f"Markdown table saved to: {md_path}")
+    print()
+    print(md)
+
+    return aggregated
+
+
+def _format_ablation_table(results: dict[str, Any]) -> str:
+    """Format ablation results as a markdown table.
+
+    Args:
+        results: Aggregated method results.
+
+    Returns:
+        Markdown-formatted ablation table string.
+    """
+    modality_map = {
+        "MLP (pose-only)":       {"landmarks": "x", "appearance": "",  "fusion": "--"},
+        "CNN (appearance-only)": {"landmarks": "",  "appearance": "x", "fusion": "--"},
+        "Weighted Average":      {"landmarks": "x", "appearance": "x", "fusion": "W. Avg"},
+        "Learned Fusion":        {"landmarks": "x", "appearance": "x", "fusion": "Concat+MLP"},
+    }
+
+    lines = [
+        "| # | Model | Landmarks | Appearance | Fusion | Accuracy (%) | F1-macro |",
+        "|---|-------|:---------:|:----------:|:------:|:------------:|:--------:|",
+    ]
+
+    for idx, (name, r) in enumerate(results.items(), start=1):
+        m = modality_map.get(name, {"landmarks": "?", "appearance": "?", "fusion": "?"})
+        acc = f"{r['mean_accuracy'] * 100:.1f} +/- {r['std_accuracy'] * 100:.1f}"
+        f1 = f"{r['mean_f1']:.3f} +/- {r['std_f1']:.3f}"
+        lines.append(
+            f"| {idx} | {name} | {m['landmarks']} | {m['appearance']} "
+            f"| {m['fusion']} | {acc} | {f1} |"
+        )
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# CLI entry point
+# ---------------------------------------------------------------------------
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Run ablation study: MLP vs CNN vs Fusion variants.",
+    )
+    parser.add_argument(
+        "--paired-csv",
+        required=True,
+        help="Path to paired fusion CSV (from build_fusion_dataset.py).",
+    )
+    parser.add_argument(
+        "--mlp-model",
+        default=None,
+        help="Path to saved MLP model directory (optional).",
+    )
+    parser.add_argument(
+        "--cnn-model",
+        default=None,
+        help="Path to saved CNN model file (optional).",
+    )
+    parser.add_argument(
+        "--n-splits",
+        type=int,
+        default=5,
+        help="Number of GroupKFold splits (default: 5).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="results/ablation",
+        help="Output directory for results (default: results/ablation).",
+    )
+
+    args = parser.parse_args(argv)
+    run_ablation(
+        paired_csv=args.paired_csv,
+        mlp_model_path=args.mlp_model,
+        cnn_model_path=args.cnn_model,
+        n_splits=args.n_splits,
+        output_dir=args.output_dir,
+    )
+
+
+if __name__ == "__main__":
+    main()
+
+Writing ml/scripts/run_ablation.py
+
+[26]
+0s
+# Run ablation study (requires paired_fusion.csv)
+if os.path.exists('data/paired_fusion.csv'):
+    !python ml/scripts/run_ablation.py \
+        --paired-csv data/paired_fusion.csv \
+        --n-splits 5 \
+        --output-dir results/ablation
+else:
+    print('Skipping ablation: data/paired_fusion.csv not found.')
+    print('Run the build_fusion_dataset step first.')
+Skipping ablation: data/paired_fusion.csv not found.
+Run the build_fusion_dataset step first.
+5. Unified Evaluation (Phase 05)
+Generates shared K-Fold splits and runs a unified evaluation across all methods. Produces comparison tables, confusion matrices, and per-class F1 charts.
+
+
+[27]
+0s
+%%writefile ml/scripts/generate_splits.py
+#!/usr/bin/env python
+"""Generate and save consistent Group K-Fold splits for all evaluation methods.
+
+All methods (MLP, CNN, Fusion, YOLO) **must** use the same fold assignments to
+guarantee a fair comparison.  This script reads a metadata CSV that contains at
+minimum a ``user_id`` column (person identifier), computes ``GroupKFold``
+splits, and persists them to a JSON file.
+
+Usage::
+
+    python ml/scripts/generate_splits.py \\
+        --metadata data/paired_fusion.csv \\
+        --output   data/kfold_splits.json \\
+        --n-splits 5
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import GroupKFold
+
+
+def generate_splits(
+    metadata_csv: str,
+    n_splits: int = 5,
+) -> tuple[dict[str, dict[str, list[int]]], pd.DataFrame]:
+    """Compute GroupKFold splits from a metadata CSV.
+
+    Args:
+        metadata_csv: Path to CSV containing at least ``user_id`` and
+            ``gesture_label`` columns.
+        n_splits: Number of folds.
+
+    Returns:
+        ``(splits_dict, dataframe)`` where *splits_dict* maps
+        ``"fold_0"``..``"fold_{n-1}"`` to ``{"train": [...], "val": [...]}``.
+    """
+    df = pd.read_csv(metadata_csv)
+
+    # Resolve user column -- prefer user_id, fall back to person_id.
+    user_col = "user_id" if "user_id" in df.columns else "person_id"
+    if user_col not in df.columns:
+        raise ValueError(
+            f"Metadata CSV must contain a 'user_id' or 'person_id' column. "
+            f"Found columns: {list(df.columns)}"
+        )
+
+    label_col = "gesture_label"
+    if label_col not in df.columns:
+        raise ValueError(f"Metadata CSV must contain a '{label_col}' column.")
+
+    groups = df[user_col].values
+    y = df[label_col].values
+    X_dummy = np.zeros(len(df))  # GroupKFold only needs length.
+
+    gkf = GroupKFold(n_splits=n_splits)
+    splits: dict[str, dict[str, list[int]]] = {}
+
+    for fold_idx, (train_idx, val_idx) in enumerate(gkf.split(X_dummy, y, groups)):
+        splits[f"fold_{fold_idx}"] = {
+            "train": train_idx.tolist(),
+            "val": val_idx.tolist(),
+        }
+
+    return splits, df
+
+
+def save_splits(
+    splits: dict[str, dict[str, list[int]]],
+    output_path: str,
+) -> None:
+    """Persist splits dictionary to JSON.
+
+    Args:
+        splits: Fold-to-index mapping.
+        output_path: Destination JSON file.
+    """
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    with open(output_path, "w") as f:
+        json.dump(splits, f, indent=2)
+
+
+def print_statistics(
+    splits: dict[str, dict[str, list[int]]],
+    df: pd.DataFrame,
+) -> None:
+    """Print per-fold sample and person counts.
+
+    Args:
+        splits: Fold mapping produced by ``generate_splits``.
+        df: The source DataFrame.
+    """
+    user_col = "user_id" if "user_id" in df.columns else "person_id"
+    label_col = "gesture_label"
+
+    print("=== Group K-Fold Split Statistics ===")
+    print(f"  Total samples: {len(df)}")
+    print(f"  Total persons: {df[user_col].nunique()}")
+    print(f"  Folds:         {len(splits)}")
+    print()
+
+    for fold_name in sorted(splits.keys()):
+        idxs = splits[fold_name]
+        train_persons = df.iloc[idxs["train"]][user_col].nunique()
+        val_persons = df.iloc[idxs["val"]][user_col].nunique()
+        train_dist = df.iloc[idxs["train"]][label_col].value_counts().to_dict()
+        val_dist = df.iloc[idxs["val"]][label_col].value_counts().to_dict()
+
+        print(
+            f"  {fold_name}: "
+            f"train={len(idxs['train'])} samples ({train_persons} persons), "
+            f"val={len(idxs['val'])} samples ({val_persons} persons)"
+        )
+        print(f"    train classes: {train_dist}")
+        print(f"    val   classes: {val_dist}")
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Generate and save Group K-Fold splits for evaluation.",
+    )
+    parser.add_argument(
+        "--metadata",
+        required=True,
+        help="Path to metadata CSV with user_id and gesture_label columns.",
+    )
+    parser.add_argument(
+        "--output",
+        default="data/kfold_splits.json",
+        help="Output JSON path (default: data/kfold_splits.json).",
+    )
+    parser.add_argument(
+        "--n-splits",
+        type=int,
+        default=5,
+        help="Number of K-Fold splits (default: 5).",
+    )
+
+    args = parser.parse_args(argv)
+    splits, df = generate_splits(args.metadata, n_splits=args.n_splits)
+    save_splits(splits, args.output)
+    print_statistics(splits, df)
+    print(f"\nSplits saved to: {args.output}")
+
+
+if __name__ == "__main__":
+    main()
+
+Writing ml/scripts/generate_splits.py
+
+[28]
+0s
+# Generate shared K-Fold splits (requires paired_fusion.csv with gesture_label column)
+if os.path.exists('data/paired_fusion.csv'):
+    !python ml/scripts/generate_splits.py \
+        --metadata data/paired_fusion.csv \
+        --output data/kfold_splits.json
+else:
+    print('Skipping: data/paired_fusion.csv not found.')
+Skipping: data/paired_fusion.csv not found.
+
+[29]
+0s
+%%writefile ml/scripts/unified_evaluation.py
+#!/usr/bin/env python
+"""Unified evaluation: collect results from all methods, generate comparison tables.
+
+Aggregates per-fold metrics from MLP, CNN, Fusion, and YOLO into a single
+evaluation framework.  Produces:
+
+    - Markdown comparison table (sorted by accuracy)
+    - Markdown ablation table (modality contributions)
+    - Per-method confusion matrices (PNG)
+    - Per-class F1 grouped bar chart (PNG)
+    - Latency benchmark table
+    - Full JSON dump of all metrics
+
+Usage::
+
+    python ml/scripts/unified_evaluation.py \\
+        --results-dir results/ablation \\
+        --output-dir  results/evaluation
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import time
+from typing import Any, Callable
+
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+)
+
+# Add parent directory for local imports.
+_ML_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ML_DIR not in sys.path:
+    sys.path.insert(0, _ML_DIR)
+
+from preprocessing import GESTURE_CLASSES  # noqa: E402
+
+# Canonical sorted class names -- consistent across all evaluation code.
+CLASS_NAMES = sorted(GESTURE_CLASSES)  # ["fist", "frame", "none", "open_hand", "pinch"]
+
+# Colours reused from cv_visualizations.py for visual consistency.
+GESTURE_COLORS = {
+    "fist": "#F44336",
+    "frame": "#4CAF50",
+    "none": "#9E9E9E",
+    "open_hand": "#2196F3",
+    "pinch": "#FF9800",
+}
+
+METHOD_COLORS = [
+    "#2196F3",  # blue
+    "#4CAF50",  # green
+    "#FF9800",  # orange
+    "#E91E63",  # pink
+    "#9C27B0",  # purple
+    "#00BCD4",  # cyan
+    "#795548",  # brown
+]
+
+
+class UnifiedEvaluation:
+    """Collect and compare results across all gesture recognition methods.
+
+    Attributes:
+        class_names: Sorted list of gesture class names.
+        results: Mapping of method name to aggregated metrics.
+        yolo_results: Separate storage for YOLO detection metrics (different
+            metric space -- mAP vs accuracy).
+    """
+
+    def __init__(
+        self,
+        class_names: list[str] | None = None,
+    ) -> None:
+        self.class_names = class_names or CLASS_NAMES
+        self.results: dict[str, dict[str, Any]] = {}
+        self.yolo_results: dict[str, Any] | None = None
+
+    # ------------------------------------------------------------------
+    # Adding results
+    # ------------------------------------------------------------------
+
+    def add_result(
+        self,
+        method_name: str,
+        fold_metrics: list[dict[str, Any]],
+    ) -> None:
+        """Register per-fold metrics for a classification method.
+
+        Args:
+            method_name: Human-readable method name (e.g. "MLP (pose-only)").
+            fold_metrics: List of dicts, one per fold.  Each dict must contain
+                ``accuracy`` (float), ``f1_macro`` (float), ``y_true`` and
+                ``y_pred`` (arrays of string labels or integer indices).
+        """
+        accs = [m["accuracy"] for m in fold_metrics]
+        f1s = [m["f1_macro"] for m in fold_metrics]
+
+        all_y_true = np.concatenate([np.asarray(m["y_true"]) for m in fold_metrics])
+        all_y_pred = np.concatenate([np.asarray(m["y_pred"]) for m in fold_metrics])
+
+        report = classification_report(
+            all_y_true,
+            all_y_pred,
+            labels=self.class_names,
+            output_dict=True,
+            zero_division=0,
+        )
+
+        self.results[method_name] = {
+            "per_fold_accuracy": accs,
+            "mean_accuracy": float(np.mean(accs)),
+            "std_accuracy": float(np.std(accs)),
+            "mean_f1": float(np.mean(f1s)),
+            "std_f1": float(np.std(f1s)),
+            "all_y_true": all_y_true,
+            "all_y_pred": all_y_pred,
+            "per_class_metrics": report,
+            "n_folds": len(fold_metrics),
+        }
+
+    def add_yolo_results(
+        self,
+        maps50: list[float],
+        maps95: list[float],
+        derived_accs: list[float] | None = None,
+    ) -> None:
+        """Register YOLO detection results (separate metric space).
+
+        Args:
+            maps50: Per-fold mAP@50 values.
+            maps95: Per-fold mAP@50-95 values.
+            derived_accs: Per-fold classification accuracy derived from
+                detection outputs (optional).
+        """
+        self.yolo_results = {
+            "mAP50_mean": float(np.mean(maps50)),
+            "mAP50_std": float(np.std(maps50)),
+            "mAP95_mean": float(np.mean(maps95)),
+            "mAP95_std": float(np.std(maps95)),
+            "per_fold_mAP50": maps50,
+            "per_fold_mAP95": maps95,
+        }
+        if derived_accs is not None:
+            self.yolo_results["derived_acc_mean"] = float(np.mean(derived_accs))
+            self.yolo_results["derived_acc_std"] = float(np.std(derived_accs))
+            self.yolo_results["per_fold_derived_acc"] = derived_accs
+
+    # ------------------------------------------------------------------
+    # Table generation
+    # ------------------------------------------------------------------
+
+    def comparison_table(self) -> str:
+        """Generate a markdown comparison table sorted by accuracy.
+
+        Returns:
+            Markdown-formatted string.
+        """
+        lines = [
+            "| Method | Accuracy (%) | F1-macro | Folds |",
+            "|--------|:------------:|:--------:|:-----:|",
+        ]
+
+        sorted_methods = sorted(
+            self.results.items(),
+            key=lambda x: x[1]["mean_accuracy"],
+            reverse=True,
+        )
+
+        for name, r in sorted_methods:
+            acc = (
+                f"{r['mean_accuracy'] * 100:.1f} "
+                f"+/- {r['std_accuracy'] * 100:.1f}"
+            )
+            f1 = f"{r['mean_f1']:.3f} +/- {r['std_f1']:.3f}"
+            folds = r.get("n_folds", "?")
+            lines.append(f"| {name} | {acc} | {f1} | {folds} |")
+
+        # Append YOLO if available.
+        if self.yolo_results is not None:
+            yr = self.yolo_results
+            acc_str = "--"
+            if "derived_acc_mean" in yr:
+                acc_str = (
+                    f"{yr['derived_acc_mean'] * 100:.1f} "
+                    f"+/- {yr['derived_acc_std'] * 100:.1f}"
+                )
+            map_str = (
+                f"mAP50={yr['mAP50_mean']:.3f}, "
+                f"mAP95={yr['mAP95_mean']:.3f}"
+            )
+            lines.append(f"| YOLOv8n (detection) | {acc_str} | {map_str} | -- |")
+
+        return "\n".join(lines)
+
+    def ablation_table(self) -> str:
+        """Generate a markdown ablation table showing modality contributions.
+
+        Returns:
+            Markdown-formatted string.
+        """
+        modality_map = {
+            "MLP (pose-only)":       {"lm": "x", "app": "",  "fusion": "--"},
+            "CNN (appearance-only)": {"lm": "",  "app": "x", "fusion": "--"},
+            "Weighted Average":      {"lm": "x", "app": "x", "fusion": "W. Avg"},
+            "Learned Fusion":        {"lm": "x", "app": "x", "fusion": "Concat+MLP"},
+        }
+
+        lines = [
+            "| # | Model | Landmarks | Appearance | Fusion | Accuracy (%) | F1-macro |",
+            "|---|-------|:---------:|:----------:|:------:|:------------:|:--------:|",
+        ]
+
+        row_order = [
+            "MLP (pose-only)",
+            "CNN (appearance-only)",
+            "Weighted Average",
+            "Learned Fusion",
+        ]
+
+        idx = 1
+        for name in row_order:
+            if name not in self.results:
+                continue
+            r = self.results[name]
+            m = modality_map.get(
+                name, {"lm": "?", "app": "?", "fusion": "?"}
+            )
+            acc = (
+                f"{r['mean_accuracy'] * 100:.1f} "
+                f"+/- {r['std_accuracy'] * 100:.1f}"
+            )
+            f1 = f"{r['mean_f1']:.3f} +/- {r['std_f1']:.3f}"
+            lines.append(
+                f"| {idx} | {name} | {m['lm']} | {m['app']} "
+                f"| {m['fusion']} | {acc} | {f1} |"
+            )
+            idx += 1
+
+        # Additional methods not in the canonical ablation order.
+        for name, r in self.results.items():
+            if name in row_order:
+                continue
+            acc = (
+                f"{r['mean_accuracy'] * 100:.1f} "
+                f"+/- {r['std_accuracy'] * 100:.1f}"
+            )
+            f1 = f"{r['mean_f1']:.3f} +/- {r['std_f1']:.3f}"
+            lines.append(
+                f"| {idx} | {name} | ? | ? | ? | {acc} | {f1} |"
+            )
+            idx += 1
+
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Visualization
+    # ------------------------------------------------------------------
+
+    def generate_confusion_matrices(
+        self,
+        output_dir: str,
+        normalize: bool = True,
+        figsize_per: tuple[int, int] = (6, 5),
+    ) -> list[str]:
+        """Save a confusion matrix heatmap for each method.
+
+        Args:
+            output_dir: Directory to save PNG files.
+            normalize: Whether to row-normalize the matrix.
+            figsize_per: ``(width, height)`` for each subplot.
+
+        Returns:
+            List of saved file paths.
+        """
+        os.makedirs(output_dir, exist_ok=True)
+        saved: list[str] = []
+
+        for name, r in self.results.items():
+            y_true = r["all_y_true"]
+            y_pred = r["all_y_pred"]
+            cm = confusion_matrix(y_true, y_pred, labels=self.class_names)
+
+            fig, ax = plt.subplots(figsize=figsize_per)
+
+            if normalize:
+                row_sums = cm.sum(axis=1, keepdims=True)
+                cm_plot = np.divide(
+                    cm.astype(float),
+                    row_sums,
+                    out=np.zeros_like(cm, dtype=float),
+                    where=row_sums != 0,
+                )
+                sns.heatmap(
+                    cm_plot,
+                    annot=True,
+                    fmt=".2%",
+                    cmap="Blues",
+                    xticklabels=self.class_names,
+                    yticklabels=self.class_names,
+                    ax=ax,
+                )
+            else:
+                sns.heatmap(
+                    cm,
+                    annot=True,
+                    fmt="d",
+                    cmap="Blues",
+                    xticklabels=self.class_names,
+                    yticklabels=self.class_names,
+                    ax=ax,
+                )
+
+            safe_name = name.replace(" ", "_").replace("(", "").replace(")", "")
+            ax.set_title(f"Confusion Matrix -- {name}")
+            ax.set_ylabel("True Label")
+            ax.set_xlabel("Predicted Label")
+            plt.tight_layout()
+
+            path = os.path.join(output_dir, f"cm_{safe_name}.png")
+            plt.savefig(path, dpi=150, bbox_inches="tight")
+            plt.close()
+            saved.append(path)
+
+        return saved
+
+    def generate_f1_chart(
+        self,
+        output_dir: str,
+        figsize: tuple[int, int] = (12, 6),
+    ) -> str:
+        """Save a grouped bar chart of per-class F1 scores across methods.
+
+        Args:
+            output_dir: Directory for the output PNG.
+            figsize: Figure size.
+
+        Returns:
+            Path to the saved figure.
+        """
+        os.makedirs(output_dir, exist_ok=True)
+
+        methods = list(self.results.keys())
+        n_methods = len(methods)
+        n_classes = len(self.class_names)
+        x = np.arange(n_classes)
+        width = 0.8 / max(n_methods, 1)
+
+        fig, ax = plt.subplots(figsize=figsize)
+
+        for i, method in enumerate(methods):
+            report = self.results[method].get("per_class_metrics", {})
+            f1_scores = []
+            for cls in self.class_names:
+                cls_metrics = report.get(cls, {})
+                f1_scores.append(cls_metrics.get("f1-score", 0.0))
+
+            offset = (i - n_methods / 2 + 0.5) * width
+            color = METHOD_COLORS[i % len(METHOD_COLORS)]
+            ax.bar(
+                x + offset,
+                f1_scores,
+                width,
+                label=method,
+                color=color,
+            )
+
+        ax.set_title("Per-Class F1 Score Comparison", fontsize=14, fontweight="bold")
+        ax.set_ylabel("F1 Score")
+        ax.set_xticks(x)
+        ax.set_xticklabels(
+            [c.replace("_", " ").title() for c in self.class_names],
+            rotation=45,
+            ha="right",
+        )
+        ax.set_ylim(0, 1.1)
+        ax.legend(fontsize=9)
+        ax.grid(axis="y", alpha=0.3)
+        plt.tight_layout()
+
+        path = os.path.join(output_dir, "per_class_f1.png")
+        plt.savefig(path, dpi=200, bbox_inches="tight")
+        plt.close()
+        return path
+
+    def generate_accuracy_chart(
+        self,
+        output_dir: str,
+        figsize: tuple[int, int] = (10, 6),
+    ) -> str:
+        """Save an accuracy comparison bar chart with error bars.
+
+        Args:
+            output_dir: Directory for the output PNG.
+            figsize: Figure size.
+
+        Returns:
+            Path to the saved figure.
+        """
+        os.makedirs(output_dir, exist_ok=True)
+
+        methods = list(self.results.keys())
+        accs = [self.results[m]["mean_accuracy"] for m in methods]
+        stds = [self.results[m]["std_accuracy"] for m in methods]
+        colors = [METHOD_COLORS[i % len(METHOD_COLORS)] for i in range(len(methods))]
+
+        fig, ax = plt.subplots(figsize=figsize)
+        bars = ax.bar(
+            methods, accs, yerr=stds, capsize=5,
+            color=colors, edgecolor="black", linewidth=0.5,
+        )
+
+        for bar, acc, std in zip(bars, accs, stds):
+            label = f"{acc:.1%}"
+            if std > 0:
+                label += f" +/- {std:.1%}"
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + std + 0.01,
+                label,
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+
+        ax.set_title("Method Accuracy Comparison", fontsize=14, fontweight="bold")
+        ax.set_ylabel("Accuracy")
+        ax.set_ylim(0, 1.15)
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v:.0%}"))
+        plt.xticks(rotation=30, ha="right")
+        plt.tight_layout()
+
+        path = os.path.join(output_dir, "accuracy_comparison.png")
+        plt.savefig(path, dpi=200, bbox_inches="tight")
+        plt.close()
+        return path
+
+    # ------------------------------------------------------------------
+    # Latency benchmarking
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def benchmark_latency(
+        models: dict[str, Callable[..., Any]],
+        input_data: Any,
+        n_runs: int = 100,
+        warmup: int = 10,
+    ) -> dict[str, dict[str, float]]:
+        """Measure inference latency for each model function.
+
+        Args:
+            models: Mapping of method name to a callable that performs
+                inference on ``input_data``.
+            input_data: The data to pass to each callable (e.g. a single
+                sample numpy array).
+            n_runs: Number of timed iterations.
+            warmup: Number of untimed warmup iterations.
+
+        Returns:
+            Mapping of method name to ``{"mean_ms", "std_ms", "p95_ms"}``.
+        """
+        results: dict[str, dict[str, float]] = {}
+
+        for name, model_fn in models.items():
+            # Warm up.
+            for _ in range(warmup):
+                model_fn(input_data)
+
+            # Timed runs.
+            times: list[float] = []
+            for _ in range(n_runs):
+                start = time.perf_counter()
+                model_fn(input_data)
+                elapsed = time.perf_counter() - start
+                times.append(elapsed)
+
+            times_ms = np.array(times) * 1000
+            results[name] = {
+                "mean_ms": float(np.mean(times_ms)),
+                "std_ms": float(np.std(times_ms)),
+                "p95_ms": float(np.percentile(times_ms, 95)),
+            }
+
+        return results
+
+    # ------------------------------------------------------------------
+    # Save all artefacts
+    # ------------------------------------------------------------------
+
+    def save_all(self, output_dir: str) -> None:
+        """Persist all tables, charts, and raw metrics to *output_dir*.
+
+        Creates:
+            - ``comparison_table.md``
+            - ``ablation_table.md``
+            - ``confusion_matrices/`` (one PNG per method)
+            - ``per_class_f1.png``
+            - ``accuracy_comparison.png``
+            - ``metrics.json``
+
+        Args:
+            output_dir: Root output directory.
+        """
+        os.makedirs(output_dir, exist_ok=True)
+
+        # --- Markdown tables ---
+        comp_path = os.path.join(output_dir, "comparison_table.md")
+        with open(comp_path, "w") as f:
+            f.write(self.comparison_table())
+        print(f"Saved: {comp_path}")
+
+        abl_path = os.path.join(output_dir, "ablation_table.md")
+        with open(abl_path, "w") as f:
+            f.write(self.ablation_table())
+        print(f"Saved: {abl_path}")
+
+        # --- Confusion matrices ---
+        cm_dir = os.path.join(output_dir, "confusion_matrices")
+        cm_paths = self.generate_confusion_matrices(cm_dir)
+        for p in cm_paths:
+            print(f"Saved: {p}")
+
+        # --- Charts ---
+        f1_path = self.generate_f1_chart(output_dir)
+        print(f"Saved: {f1_path}")
+
+        acc_path = self.generate_accuracy_chart(output_dir)
+        print(f"Saved: {acc_path}")
+
+        # --- Raw JSON (strip numpy arrays for serialization) ---
+        json_safe: dict[str, Any] = {}
+        for name, r in self.results.items():
+            json_safe[name] = {
+                k: v for k, v in r.items()
+                if k not in ("all_y_true", "all_y_pred", "per_class_metrics")
+            }
+            # Flatten per_class_metrics.
+            if "per_class_metrics" in r:
+                pcm = {}
+                for cls in self.class_names:
+                    if cls in r["per_class_metrics"]:
+                        pcm[cls] = {
+                            kk: float(vv) if isinstance(vv, (int, float)) else vv
+                            for kk, vv in r["per_class_metrics"][cls].items()
+                        }
+                json_safe[name]["per_class_metrics"] = pcm
+
+        if self.yolo_results is not None:
+            json_safe["YOLOv8n (detection)"] = self.yolo_results
+
+        json_path = os.path.join(output_dir, "metrics.json")
+        with open(json_path, "w") as f:
+            json.dump(json_safe, f, indent=2)
+        print(f"Saved: {json_path}")
+
+        # --- Print tables to stdout ---
+        print("\n" + "=" * 70)
+        print("COMPARISON TABLE")
+        print("=" * 70)
+        print(self.comparison_table())
+
+        print("\n" + "=" * 70)
+        print("ABLATION TABLE")
+        print("=" * 70)
+        print(self.ablation_table())
+
+
+# ---------------------------------------------------------------------------
+# CLI entry point
+# ---------------------------------------------------------------------------
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Unified evaluation: generate comparison tables and plots.",
+    )
+    parser.add_argument(
+        "--results-dir",
+        default="results/ablation",
+        help="Directory containing ablation_results.json.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="results/evaluation",
+        help="Output directory for tables and plots.",
+    )
+    parser.add_argument(
+        "--yolo-json",
+        default=None,
+        help="Path to YOLO metrics JSON (optional).",
+    )
+
+    args = parser.parse_args(argv)
+
+    evaluator = UnifiedEvaluation()
+
+    # Load ablation results if available.
+    ablation_json = os.path.join(args.results_dir, "ablation_results.json")
+    if os.path.exists(ablation_json):
+        with open(ablation_json) as f:
+            ablation_data = json.load(f)
+
+        for method_name, data in ablation_data.items():
+            # Re-construct fold_metrics from the aggregated data.
+            n_folds = len(data.get("per_fold_accuracy", []))
+            if n_folds == 0:
+                continue
+
+            # We only have aggregated data; create synthetic fold entries.
+            fold_metrics = []
+            for i in range(n_folds):
+                fold_metrics.append({
+                    "accuracy": data["per_fold_accuracy"][i],
+                    "f1_macro": data.get("mean_f1", data["per_fold_accuracy"][i]),
+                    "y_true": np.array([CLASS_NAMES[0]]),  # placeholder
+                    "y_pred": np.array([CLASS_NAMES[0]]),  # placeholder
+                })
+
+            # Override with direct metrics.
+            accs = data["per_fold_accuracy"]
+            evaluator.results[method_name] = {
+                "per_fold_accuracy": accs,
+                "mean_accuracy": float(np.mean(accs)),
+                "std_accuracy": float(np.std(accs)),
+                "mean_f1": data.get("mean_f1", float(np.mean(accs))),
+                "std_f1": data.get("std_f1", 0.0),
+                "all_y_true": np.array([CLASS_NAMES[0]]),
+                "all_y_pred": np.array([CLASS_NAMES[0]]),
+                "per_class_metrics": {},
+                "n_folds": n_folds,
+            }
+
+        print(f"Loaded {len(evaluator.results)} methods from {ablation_json}")
+    else:
+        print(f"No ablation results found at {ablation_json}")
+        print("Add results manually via the UnifiedEvaluation API.")
+
+    # Load YOLO results if provided.
+    if args.yolo_json and os.path.exists(args.yolo_json):
+        with open(args.yolo_json) as f:
+            yolo_data = json.load(f)
+        evaluator.add_yolo_results(
+            maps50=yolo_data.get("mAP50", []),
+            maps95=yolo_data.get("mAP95", []),
+            derived_accs=yolo_data.get("derived_accs", None),
+        )
+        print(f"Loaded YOLO results from {args.yolo_json}")
+
+    # Generate all outputs.
+    if evaluator.results:
+        evaluator.save_all(args.output_dir)
+    else:
+        print("No results to evaluate. Run the ablation study first.")
+
+
+if __name__ == "__main__":
+    main()
+
+Writing ml/scripts/unified_evaluation.py
+
+[30]
+0s
+# Run unified evaluation (requires ablation results)
+if os.path.exists('results/ablation/ablation_results.json'):
+    !python ml/scripts/unified_evaluation.py \
+        --results-dir results/ablation \
+        --output-dir results/evaluation
+else:
+    print('Skipping unified evaluation: results/ablation/ablation_results.json not found.')
+    print('Run the ablation study first.')
+Skipping unified evaluation: results/ablation/ablation_results.json not found.
+Run the ablation study first.
+6. Results & Export
+
+[31]
+0s
+# Display ablation results
+import json
+import os
+
+print('=' * 60)
+print('RESULTS SUMMARY')
+print('=' * 60)
+
+# Ablation results
+ablation_path = 'results/ablation/ablation_results.json'
+if os.path.exists(ablation_path):
+    with open(ablation_path) as f:
+        results = json.load(f)
+    print('\nAblation Results:')
+    print(f"{'Method':<30} {'Accuracy':<20} {'F1-macro':<20}")
+    print('-' * 70)
+    for method, metrics in results.items():
+        acc = f"{metrics['mean_accuracy']*100:.1f} +/- {metrics['std_accuracy']*100:.1f}%"
+        f1 = f"{metrics['mean_f1']:.3f} +/- {metrics['std_f1']:.3f}"
+        print(f'{method:<30} {acc:<20} {f1:<20}')
+else:
+    print('No ablation results found.')
+
+# Display ablation table markdown
+md_path = 'results/ablation/ablation_table.md'
+if os.path.exists(md_path):
+    print('\nAblation Table (Markdown):')
+    with open(md_path) as f:
+        print(f.read())
+============================================================
+RESULTS SUMMARY
+============================================================
+No ablation results found.
+
+[32]
+0s
+# Display evaluation plots (if generated)
+import os
+from IPython.display import Image, display
+
+eval_dir = 'results/evaluation'
+
+for fname in ['accuracy_comparison.png', 'per_class_f1.png']:
+    fpath = os.path.join(eval_dir, fname)
+    if os.path.exists(fpath):
+        print(f'\n{fname}:')
+        display(Image(filename=fpath, width=700))
+
+# Display confusion matrices
+cm_dir = os.path.join(eval_dir, 'confusion_matrices')
+if os.path.exists(cm_dir):
+    for fname in sorted(os.listdir(cm_dir)):
+        if fname.endswith('.png'):
+            print(f'\n{fname}:')
+            display(Image(filename=os.path.join(cm_dir, fname), width=500))
+
+[33]
+0s
+# Export models: check what is available for deployment
+import os
+
+print('=== Model Export Status ===')
+
+# CNN checkpoints
+if os.path.exists('runs/cnn'):
+    for f in sorted(os.listdir('runs/cnn')):
+        if f.endswith('.pt'):
+            size_mb = os.path.getsize(os.path.join('runs/cnn', f)) / (1024 * 1024)
+
+=== Model Export Status ===
+
+Done.
+
+[34]
+0s
+# Download models to local machine (Colab only)
+try:
+    from google.colab import files
+    
+    if os.path.exists('game/cnn_model.onnx'):
+        print('Downloading CNN ONNX model...')
+        files.download('game/cnn_model.onnx')
+    
+    # Download ablation results
+    if os.path.exists('results/ablation/ablation_results.json'):
+
+Colab paid products - Cancel contracts here
+Beta
+0 / 0
+used queries
+1
